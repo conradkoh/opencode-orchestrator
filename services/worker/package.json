@@ -1,0 +1,43 @@
+{
+  "name": "@opencode-orchestrator/worker",
+  "version": "0.1.0",
+  "description": "Assistant worker runtime for orchestrating OpenCode assistants",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "test:unit": "vitest run src/__tests__/domain src/__tests__/application",
+    "test:integration": "vitest run src/__tests__/integration",
+    "test:e2e": "vitest run src/__tests__/e2e",
+    "test:coverage": "vitest --coverage",
+    "test:watch": "vitest watch",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "orchestrator",
+    "worker",
+    "assistant"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@opencode-ai/sdk": "^0.15.30",
+    "convex": "^1.16.0",
+    "nanoid": "^5.0.8",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^20.17.6",
+    "@vitest/coverage-v8": "^1.6.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^1.6.0"
+  }
+}
