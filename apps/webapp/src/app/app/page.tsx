@@ -1,83 +1,61 @@
 'use client';
 
-import Link from 'next/link';
-import { useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { useAuthState } from '@/modules/auth/AuthProvider';
+import { useCallback, useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChatInterface } from '@/modules/assistant/components/ChatInterface';
+import { CreateMachineDialog } from '@/modules/assistant/components/CreateMachineDialog';
+import { MachineEmptyState } from '@/modules/assistant/components/MachineEmptyState';
+import { useMachines } from '@/modules/assistant/hooks/useMachines';
 
 /**
- * Displays the main application dashboard with user-specific content and navigation.
+ * Main application page for assistant orchestration.
+ * Displays empty state if no machines exist, otherwise shows the chat interface.
+ *
+ * @example
+ * This page is automatically rendered at the `/app` route.
  */
 export default function AppPage() {
-  const authState = useAuthState();
+  const { machines, loading } = useMachines();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const isAuthenticated = authState?.state === 'authenticated';
-  const isAnonymousUser = useMemo(() => {
-    return isAuthenticated && authState.user.type === 'anonymous';
-  }, [isAuthenticated, authState]);
+  /**
+   * Handles opening the create machine dialog.
+   */
+  const handleCreateMachine = useCallback(() => {
+    setShowCreateDialog(true);
+  }, []);
 
-  const dashboardContent = useMemo(() => {
-    if (!isAuthenticated) return null;
+  /**
+   * Handles closing the create machine dialog.
+   */
+  const handleDialogChange = useCallback((open: boolean) => {
+    setShowCreateDialog(open);
+  }, []);
 
+  const hasMachines = useMemo(() => machines && machines.length > 0, [machines]);
+
+  if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="p-4 bg-accent/40 rounded-md">
-          <h2 className="text-xl font-semibold mb-2">What's Next?</h2>
-          <p className="text-foreground">
-            This is your main app dashboard. From here, you can explore the application features.
-          </p>
-
-          {isAnonymousUser && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                <span className="font-semibold">Tip:</span> You're using an anonymous account. Visit
-                your{' '}
-                <Link
-                  href="/app/profile"
-                  className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300"
-                >
-                  profile page
-                </Link>{' '}
-                to personalize your display name.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <div className="p-4 border rounded-md">
-            <h3 className="font-medium mb-2">Your Content</h3>
-            <p className="text-sm text-muted-foreground">
-              No content yet. Start creating by using the app features.
-            </p>
-          </div>
-
-          <div className="p-4 border rounded-md">
-            <h3 className="font-medium mb-2">Recent Activity</h3>
-            <p className="text-sm text-muted-foreground">Your recent activity will appear here.</p>
-          </div>
+      <div className="container mx-auto h-full p-4">
+        <div className="flex h-full flex-col gap-4">
+          <Skeleton className="h-[200px] w-full" />
+          <Skeleton className="flex-1" />
         </div>
       </div>
     );
-  }, [isAuthenticated, isAnonymousUser]);
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-card rounded-lg shadow-md p-6 mb-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Welcome to the App</h1>
-
-            <Link href="/app/profile">
-              <Button variant="outline" size="sm">
-                View Profile
-              </Button>
-            </Link>
-          </div>
-
-          {dashboardContent}
-        </div>
+    <>
+      <div className="container mx-auto h-full p-4">
+        {!hasMachines ? (
+          <MachineEmptyState onCreateMachine={handleCreateMachine} />
+        ) : (
+          <ChatInterface />
+        )}
       </div>
-    </div>
+
+      <CreateMachineDialog open={showCreateDialog} onOpenChange={handleDialogChange} />
+    </>
   );
 }
