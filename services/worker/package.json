@@ -14,6 +14,7 @@
     "test:e2e": "vitest run src/__tests__/e2e",
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest watch",
+    "test:opencode": "tsx src/scripts/test-opencode.ts",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "typecheck": "tsc --noEmit"

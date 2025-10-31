@@ -59,7 +59,7 @@ export class MachineServer {
    * @param config - Configuration for starting the server
    * @throws Error if authentication fails or configuration is invalid
    */
-  async start(config: StartConfig): Promise<void> {
+  async start(_config: StartConfig): Promise<void> {
     if (this._isRunning) {
       throw new Error('Machine server is already running');
     }
