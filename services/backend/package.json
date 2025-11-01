@@ -16,6 +16,7 @@
   "dependencies": {
     "convex": "^1.27.3",
     "convex-helpers": "^0.1.104",
+    "nanoid": "^5.0.8",
     "zod": "^4.0.5"
   },
   "devDependencies": {
