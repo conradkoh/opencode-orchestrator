@@ -9,7 +9,9 @@
       "options": {
         "command": "pnpm build",
         "cwd": "apps/webapp"
-      }
+      },
+      "outputs": ["{projectRoot}/.next"],
+      "dependsOn": ["^build"]
     },
     "dev": {
       "executor": "nx:run-commands",
@@ -31,6 +33,14 @@
         "command": "pnpm lint",
         "cwd": "apps/webapp"
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm typecheck",
+        "cwd": "apps/webapp"
+      },
+      "dependsOn": ["^build"]
     }
   },
   "tags": []
