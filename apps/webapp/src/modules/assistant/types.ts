@@ -300,3 +300,20 @@ export interface RejectWorkerReturn {
   /** Error object if rejection failed, null otherwise */
   error: Error | null;
 }
+
+/**
+ * Return value from the useRemoveWorker hook.
+ * Provides worker removal function and loading state.
+ */
+export interface RemoveWorkerReturn {
+  /**
+   * Removes a worker from the system.
+   * @param workerId - ID of the worker to remove
+   * @returns Promise that resolves when worker is removed
+   */
+  removeWorker: (workerId: string) => Promise<void>;
+  /** Whether removal is in progress */
+  isRemoving: boolean;
+  /** Error object if removal failed, null otherwise */
+  error: Error | null;
+}

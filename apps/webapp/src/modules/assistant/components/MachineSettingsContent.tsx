@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { useDeleteMachine } from '../hooks/useDeleteMachine';
 import { useMachines } from '../hooks/useMachines';
 import { PendingWorkersList } from './PendingWorkersList';
+import { WorkersList } from './WorkersList';
 
 /**
  * Props for MachineSettingsContent component.
@@ -91,6 +92,9 @@ export function MachineSettingsContent({ machineId }: MachineSettingsContentProp
     <div className="space-y-6">
       {/* Pending Workers */}
       <PendingWorkersList machineId={machineId} />
+
+      {/* All Workers */}
+      <WorkersList machineId={machineId} />
 
       {/* Machine Details */}
       <Card>
