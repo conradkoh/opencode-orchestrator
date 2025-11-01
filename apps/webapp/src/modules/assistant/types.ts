@@ -20,6 +20,15 @@ export interface Machine {
   lastSeen: number;
   /** Number of assistants registered on this machine */
   assistantCount: number;
+  /** Worker counts by status */
+  workerCounts: {
+    /** Number of online/ready workers */
+    online: number;
+    /** Number of offline workers */
+    offline: number;
+    /** Number of pending authorization workers */
+    pending: number;
+  };
 }
 
 /**

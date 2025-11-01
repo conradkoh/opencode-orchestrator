@@ -159,12 +159,24 @@ export const list = query({
           .withIndex('by_machine_id', (q) => q.eq('machineId', machine.machineId))
           .collect();
 
+        // Count workers by status
+        const onlineCount = workers.filter(
+          (w) => w.status === 'online' || w.status === 'ready'
+        ).length;
+        const offlineCount = workers.filter((w) => w.status === 'offline').length;
+        const pendingCount = workers.filter((w) => w.status === 'pending_authorization').length;
+
         return {
           machineId: machine.machineId,
           name: machine.name,
           status: machine.status,
           lastSeen: machine.lastHeartbeat,
-          assistantCount: workers.length,
+          assistantCount: workers.length, // Keep for backward compatibility
+          workerCounts: {
+            online: onlineCount,
+            offline: offlineCount,
+            pending: pendingCount,
+          },
         };
       })
     );
