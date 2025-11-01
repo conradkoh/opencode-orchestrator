@@ -5,8 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts",
     "build": "tsc",
     "test": "vitest",
     "test:unit": "vitest run src/__tests__/domain src/__tests__/application",
@@ -14,7 +14,7 @@
     "test:e2e": "vitest run src/__tests__/e2e",
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest watch",
-    "test:opencode": "tsx src/scripts/test-opencode.ts",
+    "test:opencode": "bun run src/scripts/test-opencode.ts",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "typecheck": "tsc --noEmit"
@@ -38,7 +38,7 @@
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^20.17.6",
     "@vitest/coverage-v8": "^1.6.0",
-    "tsx": "^4.19.2",
+    "bun-types": "^1.1.38",
     "typescript": "^5.7.2",
     "vitest": "^1.6.0"
   }
