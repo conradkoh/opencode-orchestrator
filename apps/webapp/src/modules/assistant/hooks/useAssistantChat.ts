@@ -38,6 +38,9 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     activeSessionId ? { sessionId: activeSessionId } : 'skip'
   );
 
+  // Debug: Also fetch all sessions to see if our session exists
+  const allSessions = useSessionQuery(api.chat.listSessions, workerId ? { workerId } : 'skip');
+
   const messagesData = useSessionQuery(
     api.chat.subscribeToMessages,
     activeSessionId ? { sessionId: activeSessionId } : 'skip'
@@ -45,7 +48,12 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
 
   // Convert session data to ChatSession type
   const session = useMemo<ChatSession | null>(() => {
-    console.log('[useAssistantChat] Session data:', { activeSessionId, sessionData });
+    console.log('[useAssistantChat] Session data:', {
+      activeSessionId,
+      sessionData,
+      allSessions: allSessions?.map((s) => s.sessionId),
+      allSessionsCount: allSessions?.length,
+    });
     if (!sessionData) return null;
     return {
       sessionId: sessionData.sessionId,
@@ -55,7 +63,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
       createdAt: sessionData.createdAt,
       lastActivity: sessionData.lastActivity,
     };
-  }, [sessionData, activeSessionId]);
+  }, [sessionData, activeSessionId, allSessions]);
 
   // Convert messages data to ChatMessage type and handle streaming
   const messages = useMemo<ChatMessage[]>(() => {
