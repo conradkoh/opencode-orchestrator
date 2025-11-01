@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAssistantChat } from '../hooks/useAssistantChat';
 import { useAssistantSessions } from '../hooks/useAssistantSessions';
-import { useAssistants } from '../hooks/useAssistants';
 import { useMachines } from '../hooks/useMachines';
+import { useWorkers } from '../hooks/useWorkers';
 import { AssistantSelector } from './AssistantSelector';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
@@ -28,41 +28,39 @@ export function ChatInterface() {
   const { machines, loading: machinesLoading } = useMachines();
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
 
-  const { assistants, loading: assistantsLoading } = useAssistants(selectedMachineId || undefined);
-  const [selectedAssistantId, setSelectedAssistantId] = useState<string | null>(null);
+  const { workers, loading: workersLoading } = useWorkers(selectedMachineId || '');
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [showNewSession, setShowNewSession] = useState(false);
 
-  const selectedAssistant = useMemo(
-    () => assistants?.find((a) => a.assistantId === selectedAssistantId),
-    [assistants, selectedAssistantId]
+  const selectedWorker = useMemo(
+    () => workers?.find((w) => w.workerId === selectedWorkerId),
+    [workers, selectedWorkerId]
   );
 
-  const availableModels = useMemo(
-    () => selectedAssistant?.availableModels || [],
-    [selectedAssistant]
-  );
+  // TODO: Get available models from worker when backend implements it
+  const availableModels = useMemo(() => ['claude-sonnet-4-5', 'claude-opus-4', 'gpt-4'], []);
 
-  const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedAssistantId);
+  const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedWorkerId);
   const { session, startSession, restoreSession, endSession, messages, sendMessage, isLoading } =
-    useAssistantChat(selectedAssistantId);
+    useAssistantChat(selectedWorkerId);
 
-  // Reset assistant selection when machine changes
+  // Reset worker selection when machine changes
   useEffect(() => {
     if (selectedMachineId !== null) {
-      setSelectedAssistantId(null);
+      setSelectedWorkerId(null);
       setShowNewSession(false);
       setSelectedModel(null);
     }
   }, [selectedMachineId]);
 
-  // Reset state when assistant changes
+  // Reset state when worker changes
   useEffect(() => {
-    if (selectedAssistantId) {
+    if (selectedWorkerId) {
       setShowNewSession(false);
       setSelectedModel(null);
     }
-  }, [selectedAssistantId]);
+  }, [selectedWorkerId]);
 
   // Auto-select first model when starting new session
   useEffect(() => {
@@ -79,10 +77,10 @@ export function ChatInterface() {
   }, []);
 
   /**
-   * Handles assistant selection change.
+   * Handles worker selection change.
    */
-  const handleAssistantChange = useCallback((assistantId: string) => {
-    setSelectedAssistantId(assistantId);
+  const handleWorkerChange = useCallback((workerId: string) => {
+    setSelectedWorkerId(workerId);
   }, []);
 
   /**
@@ -183,38 +181,47 @@ export function ChatInterface() {
           />
         </div>
 
-        {/* Assistant Selector - Only show if machine is selected */}
+        {/* Worker Selector - Only show if machine is selected */}
         {selectedMachineId && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <FolderIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground">Worker</span>
             </div>
-            {assistants && assistants.length > 0 ? (
+            {workers && workers.length > 0 ? (
               <>
                 <AssistantSelector
-                  assistants={assistants}
-                  selectedAssistantId={selectedAssistantId}
-                  onAssistantChange={handleAssistantChange}
-                  disabled={assistantsLoading || !!session}
+                  assistants={workers.map((w) => ({
+                    assistantId: w.workerId,
+                    machineId: w.machineId,
+                    machineName: machines?.find((m) => m.machineId === w.machineId)?.name || '',
+                    workingDirectory: w.name || w.workerId,
+                    displayName: w.name || `Worker ${w.workerId.slice(0, 8)}`,
+                    status: w.status === 'online' ? 'online' : 'offline',
+                    activeSessionCount: 0,
+                    availableModels: [],
+                  }))}
+                  selectedAssistantId={selectedWorkerId}
+                  onAssistantChange={handleWorkerChange}
+                  disabled={workersLoading || !!session}
                 />
-                {selectedAssistant && !session && (
+                {selectedWorker && !session && (
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Badge
-                      variant={selectedAssistant.status === 'online' ? 'default' : 'secondary'}
+                      variant={selectedWorker.status === 'online' ? 'default' : 'secondary'}
                       className="gap-1.5"
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          selectedAssistant.status === 'online'
+                          selectedWorker.status === 'online'
                             ? 'bg-green-500 dark:bg-green-400'
                             : 'bg-gray-400 dark:bg-gray-500'
                         }`}
                       />
-                      {selectedAssistant.status === 'online' ? 'Online' : 'Offline'}
+                      {selectedWorker.status === 'online' ? 'Online' : 'Offline'}
                     </Badge>
                     <span className="text-muted-foreground font-mono">
-                      {selectedAssistant.displayName}
+                      {selectedWorker.name || `Worker ${selectedWorker.workerId.slice(0, 8)}`}
                     </span>
                   </div>
                 )}
@@ -268,7 +275,7 @@ export function ChatInterface() {
             />
           </div>
         </div>
-      ) : selectedAssistantId ? (
+      ) : selectedWorkerId ? (
         <div className="flex-1 flex flex-col min-h-0 border border-border rounded-lg bg-background p-4">
           {showNewSession ? (
             <div className="space-y-4">
