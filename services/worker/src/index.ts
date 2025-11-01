@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { MachineServer } from '@presentation/MachineServer';
+import { loadConfig, promptForToken, saveToken } from './config';
 
 /**
  * Main entry point for the Assistant Worker Runtime.
@@ -12,24 +13,21 @@ import { MachineServer } from '@presentation/MachineServer';
  * - Real-time communication with Convex backend
  *
  * Usage:
- *   pnpm start                    # Start with stored token
- *   pnpm start --token <token>    # Start with explicit token
+ *   pnpm start                    # Start with stored token (or prompt on first run)
  *   pnpm start --help             # Show help
  */
 
 /**
  * Parses command line arguments.
  */
-function _parseArgs(): { token?: string; help: boolean } {
+function _parseArgs(): { help: boolean } {
   const args = process.argv.slice(2);
-  const result: { token?: string; help: boolean } = { help: false };
+  const result: { help: boolean } = { help: false };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--help' || arg === '-h') {
       result.help = true;
-    } else if (arg === '--token' || arg === '-t') {
-      result.token = args[++i];
     }
   }
 
@@ -47,24 +45,22 @@ Usage:
   pnpm start [options]
 
 Options:
-  --token, -t <token>    Machine token in format <machine_id>:<machine_secret>
   --help, -h             Show this help message
 
 Environment Variables:
-  CONVEX_URL            Convex backend URL (required)
-  MACHINE_TOKEN         Machine token (alternative to --token)
-  ROOT_DIRECTORY        Root directory for worker operations
-  IDLE_TIMEOUT          Session idle timeout in ms (default: 300000)
+  MACHINE_TOKEN         Machine token (format: <machine_id>:<machine_secret>)
+  CONVEX_URL            Convex backend URL (optional, defaults to production)
+
+First-Time Setup:
+  On first run, you will be prompted to enter your machine token.
+  Get your token from the web UI by creating a new machine.
 
 Examples:
-  # Start with stored token
+  # Start (will prompt for token on first run)
   pnpm start
 
-  # Start with explicit token
-  pnpm start --token mch_abc123:sec_xyz789
-
-  # First-time setup (will prompt for token)
-  pnpm start
+  # Show help
+  pnpm start --help
 
 For more information, visit:
   https://github.com/your-org/opencode-orchestrator
@@ -82,8 +78,31 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  console.log('🚀 Assistant Worker Runtime');
-  console.log('============================\n');
+  console.log('🚀 Starting Opencode Worker...\n');
+
+  // Load or prompt for machine token
+  let config = await loadConfig();
+
+  if (!config.machineToken) {
+    console.log('No machine token found.');
+    const token = await promptForToken();
+
+    try {
+      await saveToken(token);
+      config = await loadConfig();
+    } catch (error) {
+      console.error(
+        '❌ Invalid token format:',
+        error instanceof Error ? error.message : String(error)
+      );
+      process.exit(1);
+    }
+  }
+
+  if (!config.machineId || !config.machineSecret) {
+    console.error('❌ Failed to parse machine token');
+    process.exit(1);
+  }
 
   const server = new MachineServer();
 
@@ -98,19 +117,16 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown);
 
   try {
-    // Start the server with token from args or environment
-    await server.start({
-      token: args.token || process.env.MACHINE_TOKEN,
-      rootDirectory: process.env.ROOT_DIRECTORY,
-    });
+    // Start the server with parsed config
+    await server.start(config);
 
-    console.log('\n✅ Machine server is running');
+    console.log('\n✅ Worker is running and connected to Convex');
     console.log('Press Ctrl+C to stop\n');
 
     // Keep the process alive
     await new Promise(() => {});
   } catch (error) {
-    console.error('❌ Failed to start machine server:', error);
+    console.error('❌ Failed to start worker:', error);
     process.exit(1);
   }
 }

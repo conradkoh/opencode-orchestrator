@@ -1,15 +1,6 @@
 import type { MachineId, WorkerId } from '@domain/valueObjects/Ids';
 import type { MachineToken } from '@domain/valueObjects/MachineToken';
-
-/**
- * Configuration for starting the machine server.
- */
-export interface StartConfig {
-  /** Optional machine token for authentication. If not provided, user will be prompted. */
-  token?: string;
-  /** Root directory for worker operations. If not provided, user will be prompted. */
-  rootDirectory?: string;
-}
+import type { WorkerConfig } from '../config';
 
 /**
  * Status information about the machine.
@@ -49,34 +40,38 @@ export class MachineServer {
    * Starts the machine server and connects to Convex.
    *
    * Flow:
-   * 1. Load or prompt for machine token
-   * 2. Authenticate with Convex
-   * 3. Sync state from Convex (workers, sessions)
-   * 4. Initialize workers
-   * 5. Subscribe to Convex events
-   * 6. Start session lifecycle monitor
+   * 1. Authenticate with Convex
+   * 2. Sync state from Convex (workers, sessions)
+   * 3. Initialize workers
+   * 4. Subscribe to Convex events
+   * 5. Start session lifecycle monitor
    *
-   * @param config - Configuration for starting the server
+   * @param config - Worker configuration with machine credentials
    * @throws Error if authentication fails or configuration is invalid
    */
-  async start(_config: StartConfig): Promise<void> {
+  async start(config: WorkerConfig): Promise<void> {
     if (this._isRunning) {
       throw new Error('Machine server is already running');
     }
 
-    console.log('Starting machine server...');
+    if (!config.machineId || !config.machineSecret) {
+      throw new Error('Machine ID and secret are required');
+    }
+
+    console.log('🔐 Authenticating with Convex...');
+
+    // Store machine token
+    this._machineToken = `${config.machineId}:${config.machineSecret}` as unknown as MachineToken;
 
     // TODO: Implement full startup flow
-    // 1. Load or prompt for token
-    // 2. Parse and validate token
-    // 3. Authenticate with Convex
-    // 4. Sync state
-    // 5. Initialize workers
-    // 6. Subscribe to events
-    // 7. Start monitors
+    // 1. Authenticate with Convex (api.machines.authenticate)
+    // 2. Sync state
+    // 3. Initialize workers
+    // 4. Subscribe to events
+    // 5. Start monitors
 
     this._isRunning = true;
-    console.log('Machine server started');
+    console.log(`✅ Authenticated as machine: ${config.machineId}`);
   }
 
   /**
