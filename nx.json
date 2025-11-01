@@ -47,5 +47,8 @@
       "cache": false
     }
   },
-  "parallel": 3
+  "parallel": 3,
+  "tui": {
+    "autoExit": 0
+  }
 }
