@@ -45,6 +45,17 @@ export function ChatInterface() {
   const { session, startSession, restoreSession, endSession, messages, sendMessage, isLoading } =
     useAssistantChat(selectedWorkerId);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[ChatInterface] State:', {
+      selectedMachineId,
+      selectedWorkerId,
+      session,
+      messagesCount: messages.length,
+      showNewSession,
+    });
+  }, [selectedMachineId, selectedWorkerId, session, messages.length, showNewSession]);
+
   // Reset worker selection when machine changes
   useEffect(() => {
     if (selectedMachineId !== null) {

@@ -45,6 +45,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
 
   // Convert session data to ChatSession type
   const session = useMemo<ChatSession | null>(() => {
+    console.log('[useAssistantChat] Session data:', { activeSessionId, sessionData });
     if (!sessionData) return null;
     return {
       sessionId: sessionData.sessionId,
@@ -54,7 +55,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
       createdAt: sessionData.createdAt,
       lastActivity: sessionData.lastActivity,
     };
-  }, [sessionData]);
+  }, [sessionData, activeSessionId]);
 
   // Convert messages data to ChatMessage type and handle streaming
   const messages = useMemo<ChatMessage[]>(() => {
@@ -108,11 +109,14 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
       setError(null);
 
       try {
+        console.log('[useAssistantChat] Starting session with:', { workerId, model });
         const sessionId = await startSessionMutation({ workerId, model });
+        console.log('[useAssistantChat] Session started:', sessionId);
         setActiveSessionId(sessionId);
         return sessionId;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
+        console.error('[useAssistantChat] Error starting session:', error);
         setError(error);
         throw error;
       } finally {
