@@ -230,4 +230,19 @@ export default defineSchema({
     expiresAt: v.number(), // When this connect request expires (15 minutes from creation)
     redirectUri: v.string(), // The OAuth redirect URI used for this connect request
   }),
+
+  /**
+   * Machine registrations for the assistant orchestrator.
+   * Tracks physical machines that can host workers/assistants.
+   * Machine ID and secret are generated client-side using nanoid.
+   */
+  machines: defineTable({
+    machineId: v.string(), // Client-generated nanoid (not Convex _id)
+    secret: v.string(), // For machine authentication
+    name: v.string(), // User-friendly name (e.g., "MacBook Pro", "Desktop PC")
+    status: v.union(v.literal('online'), v.literal('offline')), // Connection status
+    rootDirectory: v.optional(v.string()), // Set during machine registration from worker
+    lastHeartbeat: v.number(), // Timestamp of last heartbeat/activity
+    userId: v.optional(v.id('users')), // Owner of this machine (TODO: implement)
+  }).index('by_machine_id', ['machineId']),
 });

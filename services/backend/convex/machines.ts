@@ -1,0 +1,89 @@
+import { v } from 'convex/values';
+import { SessionIdArg } from 'convex-helpers/server/sessions';
+import { mutation, query } from './_generated/server';
+import { getUserFromSessionId } from './modules/auth/getAuthUser';
+
+/**
+ * Create a new machine registration.
+ * Called from the web UI when user adds a new machine.
+ *
+ * @param machineId - Client-generated nanoid
+ * @param secret - Client-generated nanoid for authentication
+ * @param name - User-friendly machine name
+ * @returns Machine registration info with combined token
+ */
+export const create = mutation({
+  args: {
+    ...SessionIdArg,
+    machineId: v.string(),
+    secret: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Verify user is authenticated
+    const user = await getUserFromSessionId(ctx, args.sessionId);
+    if (!user) {
+      throw new Error('Unauthorized: Must be logged in to create a machine');
+    }
+
+    // Check if machine ID already exists
+    const existing = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
+      .first();
+
+    if (existing) {
+      throw new Error('Machine ID already exists. Please try again.');
+    }
+
+    // Create machine record
+    await ctx.db.insert('machines', {
+      machineId: args.machineId,
+      secret: args.secret,
+      name: args.name,
+      status: 'offline',
+      lastHeartbeat: Date.now(),
+      userId: user._id,
+    });
+
+    // Return registration info
+    return {
+      machineId: args.machineId,
+      token: `${args.machineId}:${args.secret}`,
+    };
+  },
+});
+
+/**
+ * List all machines for the current user.
+ * Returns machines with their status and basic info.
+ *
+ * @returns Array of machines owned by the current user
+ */
+export const list = query({
+  args: {
+    ...SessionIdArg,
+  },
+  handler: async (ctx, args) => {
+    // Verify user is authenticated
+    const user = await getUserFromSessionId(ctx, args.sessionId);
+    if (!user) {
+      return [];
+    }
+
+    // Get all machines for this user
+    const machines = await ctx.db.query('machines').collect();
+
+    // Filter by userId (TODO: add index for better performance)
+    const userMachines = machines.filter((m) => m.userId === user._id);
+
+    // Map to frontend format
+    return userMachines.map((machine) => ({
+      machineId: machine.machineId,
+      name: machine.name,
+      status: machine.status,
+      lastSeen: machine.lastHeartbeat,
+      assistantCount: 0, // TODO: Count from workers table when implemented
+    }));
+  },
+});
