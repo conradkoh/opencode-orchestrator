@@ -4,14 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "nx run-many --target=test --projects=@workspace/webapp,@workspace/backend,@workspace/worker",
     "dev": "nx run @workspace/webapp:dev",
     "setup": "node scripts/setup.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format .",
     "format:fix": "biome format --write .",
-    "typecheck": "nx run-many --target=typecheck --projects=@workspace/webapp,@workspace/backend",
+    "typecheck": "nx run-many --target=typecheck --projects=@workspace/webapp,@workspace/backend,@workspace/worker",
     "prepare": "husky"
   },
   "lint-staged": {
