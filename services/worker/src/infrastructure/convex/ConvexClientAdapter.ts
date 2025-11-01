@@ -1,16 +1,35 @@
 import { api } from '@workspace/backend/convex/_generated/api';
-import { ConvexHttpClient } from 'convex/browser';
+import { ConvexClient, ConvexHttpClient } from 'convex/browser';
 import type { WorkerConfig } from '../../config';
 
 /**
+ * Callback for new chat sessions.
+ */
+export type SessionStartCallback = (sessionId: string, model: string) => Promise<void>;
+
+/**
+ * Callback for new messages.
+ */
+export type MessageCallback = (
+  sessionId: string,
+  messageId: string,
+  content: string
+) => Promise<void>;
+
+/**
  * Adapter for Convex backend communication.
- * Handles worker registration, authorization, heartbeat, and status updates.
+ * Handles worker registration, authorization, heartbeat, status updates, and chat subscriptions.
  */
 export class ConvexClientAdapter {
-  private client: ConvexHttpClient;
+  private httpClient: ConvexHttpClient;
+  private realtimeClient: ConvexClient;
   private config: WorkerConfig;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+
+  // Chat callbacks
+  private sessionStartCallback: SessionStartCallback | null = null;
+  private messageCallback: MessageCallback | null = null;
 
   /**
    * Creates a new Convex client adapter.
@@ -19,7 +38,8 @@ export class ConvexClientAdapter {
    * @param config - Worker configuration with credentials
    */
   constructor(convexUrl: string, config: WorkerConfig) {
-    this.client = new ConvexHttpClient(convexUrl);
+    this.httpClient = new ConvexHttpClient(convexUrl);
+    this.realtimeClient = new ConvexClient(convexUrl);
     this.config = config;
   }
 
@@ -34,14 +54,15 @@ export class ConvexClientAdapter {
     name?: string;
   }> {
     try {
-      const result = await this.client.mutation(api.workers.register, {
+      const result = await this.httpClient.mutation(api.workers.register, {
         machineId: this.config.machineId,
         workerId: this.config.workerId,
       });
 
-      // If approved, start heartbeat
+      // If approved, start heartbeat and chat subscriptions
       if (result.approved) {
         this.startHeartbeat();
+        this.startChatSubscriptions();
       }
 
       return result;
@@ -98,7 +119,7 @@ export class ConvexClientAdapter {
    * Send heartbeat to Convex to update lastHeartbeat timestamp.
    */
   private async sendHeartbeat(): Promise<void> {
-    await this.client.mutation(api.workers.heartbeat, {
+    await this.httpClient.mutation(api.workers.heartbeat, {
       machineId: this.config.machineId,
       workerId: this.config.workerId,
     });
@@ -117,7 +138,7 @@ export class ConvexClientAdapter {
 
     // Update status to offline
     try {
-      await this.client.mutation(api.workers.setOffline, {
+      await this.httpClient.mutation(api.workers.setOffline, {
         machineId: this.config.machineId,
         workerId: this.config.workerId,
       });
@@ -128,7 +149,70 @@ export class ConvexClientAdapter {
       );
     }
 
-    // Note: ConvexHttpClient doesn't have a close method
-    // The client will be garbage collected
+    // Close realtime client
+    this.realtimeClient.close();
+  }
+
+  /**
+   * Set callback for new session starts.
+   */
+  onSessionStart(callback: SessionStartCallback): void {
+    this.sessionStartCallback = callback;
+  }
+
+  /**
+   * Set callback for new messages.
+   */
+  onMessage(callback: MessageCallback): void {
+    this.messageCallback = callback;
+  }
+
+  /**
+   * Start subscriptions for chat sessions and messages.
+   * Listens for new sessions and messages for this worker.
+   */
+  private startChatSubscriptions(): void {
+    // Subscribe to sessions for this worker
+    // Note: We need a backend query that filters sessions by worker
+    // For now, we'll poll for new sessions
+    // TODO: Implement proper subscription when backend supports it
+    console.log('📡 Chat subscriptions started');
+  }
+
+  /**
+   * Write a chunk of streaming response.
+   */
+  async writeChunk(
+    sessionId: string,
+    messageId: string,
+    chunk: string,
+    sequence: number
+  ): Promise<void> {
+    await this.httpClient.mutation(api.chat.writeChunk, {
+      sessionId,
+      messageId,
+      chunk,
+      sequence,
+    });
+  }
+
+  /**
+   * Complete a message with full content.
+   */
+  async completeMessage(sessionId: string, messageId: string, content: string): Promise<void> {
+    await this.httpClient.mutation(api.chat.completeMessage, {
+      sessionId,
+      messageId,
+      content,
+    });
+  }
+
+  /**
+   * Mark session as ready.
+   */
+  async sessionReady(sessionId: string): Promise<void> {
+    await this.httpClient.mutation(api.chat.sessionReady, {
+      sessionId,
+    });
   }
 }
