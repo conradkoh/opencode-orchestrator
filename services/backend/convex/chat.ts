@@ -19,11 +19,14 @@ export const startSession = mutation({
     model: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log('[startSession] Called with:', { workerId: args.workerId, model: args.model });
+
     // Verify user is authenticated
     const user = await getAuthUserOptional(ctx, args);
     if (!user) {
       throw new Error('Unauthorized: Must be logged in to start a session');
     }
+    console.log('[startSession] User authenticated:', user._id);
 
     // Verify worker exists and is online
     const worker = await ctx.db
@@ -34,6 +37,7 @@ export const startSession = mutation({
     if (!worker) {
       throw new Error('Worker not found');
     }
+    console.log('[startSession] Worker found:', worker.workerId, 'status:', worker.status);
 
     if (worker.status !== 'online' && worker.status !== 'ready') {
       throw new Error('Worker is not online');
@@ -48,9 +52,11 @@ export const startSession = mutation({
     if (!machine || machine.userId !== user._id) {
       throw new Error('Unauthorized: You do not own this worker');
     }
+    console.log('[startSession] Machine ownership verified');
 
     // Generate session ID
     const sessionId = nanoid();
+    console.log('[startSession] Generated sessionId:', sessionId);
 
     // Create session record
     await ctx.db.insert('chatSessions', {
@@ -62,6 +68,7 @@ export const startSession = mutation({
       createdAt: Date.now(),
       lastActivity: Date.now(),
     });
+    console.log('[startSession] Session created successfully');
 
     return sessionId;
   },
@@ -325,11 +332,15 @@ export const getSession = query({
     sessionId: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log('[getSession] Called with sessionId:', args.sessionId);
+
     // Verify user is authenticated
     const user = await getAuthUserOptional(ctx, args);
     if (!user) {
+      console.log('[getSession] No user found');
       return null;
     }
+    console.log('[getSession] User found:', user._id);
 
     // Find session
     const session = await ctx.db
@@ -337,15 +348,18 @@ export const getSession = query({
       .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
       .first();
 
+    console.log('[getSession] Session found:', session ? 'yes' : 'no');
     if (!session) {
       return null;
     }
 
     // Verify user owns the session
     if (session.userId !== user._id) {
+      console.log('[getSession] User does not own session');
       return null;
     }
 
+    console.log('[getSession] Returning session:', session.sessionId);
     return {
       sessionId: session.sessionId,
       workerId: session.workerId,
