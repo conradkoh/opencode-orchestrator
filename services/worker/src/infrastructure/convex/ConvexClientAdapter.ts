@@ -4,7 +4,7 @@ import type { WorkerConfig } from '../../config';
 
 /**
  * Adapter for Convex backend communication.
- * Handles authentication, heartbeat, and status updates.
+ * Handles worker registration, authorization, heartbeat, and status updates.
  */
 export class ConvexClientAdapter {
   private client: ConvexHttpClient;
@@ -16,7 +16,7 @@ export class ConvexClientAdapter {
    * Creates a new Convex client adapter.
    *
    * @param convexUrl - Convex deployment URL
-   * @param config - Worker configuration with machine credentials
+   * @param config - Worker configuration with credentials
    */
   constructor(convexUrl: string, config: WorkerConfig) {
     this.client = new ConvexHttpClient(convexUrl);
@@ -24,34 +24,52 @@ export class ConvexClientAdapter {
   }
 
   /**
-   * Authenticate with Convex and update machine status to online.
-   * Starts periodic heartbeat to maintain online status.
-   *
-   * @returns Machine details from Convex
-   * @throws Error if authentication fails
+   * Register worker with Convex and check authorization status.
+   * @returns Registration result with approval status
    */
-  async authenticate(): Promise<{ machineId: string; name: string }> {
-    if (!this.config.machineId || !this.config.machineSecret) {
-      throw new Error('Machine ID and secret are required');
-    }
-
+  async register(): Promise<{
+    status: 'pending_authorization' | 'ready';
+    approved: boolean;
+    workerId: string;
+    name?: string;
+  }> {
     try {
-      const result = await this.client.mutation(api.machines.authenticate, {
+      const result = await this.client.mutation(api.workers.register, {
         machineId: this.config.machineId,
-        secret: this.config.machineSecret,
+        workerId: this.config.workerId,
       });
 
-      // Start heartbeat
-      this.startHeartbeat();
+      // If approved, start heartbeat
+      if (result.approved) {
+        this.startHeartbeat();
+      }
 
-      return {
-        machineId: result.machineId,
-        name: result.name,
-      };
+      return result;
     } catch (error) {
       throw new Error(
-        `Authentication failed: ${error instanceof Error ? error.message : String(error)}`
+        `Worker registration failed: ${error instanceof Error ? error.message : String(error)}`
       );
+    }
+  }
+
+  /**
+   * Wait for worker approval by polling the backend.
+   * Checks every 5 seconds until worker is approved.
+   */
+  async waitForApproval(): Promise<void> {
+    console.log('⏳ Waiting for authorization approval...');
+    console.log('   Please approve this worker in the web UI\n');
+
+    while (true) {
+      const result = await this.register();
+
+      if (result.approved) {
+        console.log('✅ Worker approved! Starting...\n');
+        return;
+      }
+
+      // Wait 5 seconds before checking again
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 
@@ -80,18 +98,14 @@ export class ConvexClientAdapter {
    * Send heartbeat to Convex to update lastHeartbeat timestamp.
    */
   private async sendHeartbeat(): Promise<void> {
-    if (!this.config.machineId || !this.config.machineSecret) {
-      return;
-    }
-
-    await this.client.mutation(api.machines.heartbeat, {
+    await this.client.mutation(api.workers.heartbeat, {
       machineId: this.config.machineId,
-      secret: this.config.machineSecret,
+      workerId: this.config.workerId,
     });
   }
 
   /**
-   * Stop heartbeat and update machine status to offline.
+   * Stop heartbeat and update worker status to offline.
    * Called during graceful shutdown.
    */
   async disconnect(): Promise<void> {
@@ -102,18 +116,16 @@ export class ConvexClientAdapter {
     }
 
     // Update status to offline
-    if (this.config.machineId && this.config.machineSecret) {
-      try {
-        await this.client.mutation(api.machines.setOffline, {
-          machineId: this.config.machineId,
-          secret: this.config.machineSecret,
-        });
-      } catch (error) {
-        console.error(
-          '❌ Failed to set offline status:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
+    try {
+      await this.client.mutation(api.workers.setOffline, {
+        machineId: this.config.machineId,
+        workerId: this.config.workerId,
+      });
+    } catch (error) {
+      console.error(
+        '❌ Failed to set offline status:',
+        error instanceof Error ? error.message : String(error)
+      );
     }
 
     // Note: ConvexHttpClient doesn't have a close method

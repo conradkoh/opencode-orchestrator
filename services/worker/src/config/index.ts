@@ -1,92 +1,108 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import * as dotenv from 'dotenv';
+import { checkMissingEnvVars, loadEnv, parseWorkerConfig, type WorkerConfig } from './env';
 
 /**
- * Worker configuration loaded from environment variables.
- */
-export interface WorkerConfig {
-  /** Combined machine token (format: <machine_id>:<machine_secret>) */
-  machineToken: string | null;
-  /** Machine ID extracted from token */
-  machineId: string | null;
-  /** Machine secret extracted from token */
-  machineSecret: string | null;
-}
-
-/**
- * Load configuration from .env file.
- * Parses MACHINE_TOKEN into machineId and machineSecret.
+ * Load worker configuration from environment.
+ * If environment variables are missing, returns null to indicate setup is needed.
  *
- * @returns WorkerConfig with parsed values
+ * @returns WorkerConfig if all variables are present and valid, null otherwise
+ *
  * @example
  * ```typescript
  * const config = await loadConfig();
- * if (config.machineToken) {
- *   console.log(`Machine ID: ${config.machineId}`);
+ * if (!config) {
+ *   console.log('Configuration needed');
+ *   // Prompt for missing values
  * }
  * ```
  */
-export async function loadConfig(): Promise<WorkerConfig> {
-  // Load .env file
-  dotenv.config();
-
-  const machineToken = process.env.MACHINE_TOKEN || null;
-
-  if (!machineToken) {
-    return {
-      machineToken: null,
-      machineId: null,
-      machineSecret: null,
-    };
-  }
-
+export async function loadConfig(): Promise<WorkerConfig | null> {
   try {
-    const [machineId, machineSecret] = parseToken(machineToken);
-
-    return {
-      machineToken,
-      machineId,
-      machineSecret,
-    };
+    const env = loadEnv();
+    return parseWorkerConfig(env);
   } catch (error) {
-    console.error(
-      '❌ Error parsing machine token:',
-      error instanceof Error ? error.message : String(error)
-    );
-    return {
-      machineToken: null,
-      machineId: null,
-      machineSecret: null,
-    };
+    // Environment validation failed or variables missing
+    return null;
   }
 }
 
 /**
- * Prompt user for machine token via stdin.
- * Displays instructions and waits for user input.
+ * Interactive setup for missing environment variables.
+ * Prompts user for worker token and Convex URL if not present.
  *
- * @returns Promise resolving to the entered token
+ * @returns Promise that resolves when setup is complete
+ *
  * @example
  * ```typescript
- * const token = await promptForToken();
- * await saveToken(token);
+ * await interactiveSetup();
+ * const config = await loadConfig();
  * ```
  */
-export async function promptForToken(): Promise<string> {
-  console.log('📋 To get your machine token:');
-  console.log('   1. Go to the web UI');
-  console.log('   2. Create a new machine');
-  console.log('   3. Copy the token shown\n');
+export async function interactiveSetup(): Promise<void> {
+  console.log('🚀 Worker Setup\n');
 
+  const missing = checkMissingEnvVars();
+
+  let workerToken = process.env.WORKER_TOKEN || '';
+  let convexUrl = process.env.CONVEX_URL || '';
+
+  // Prompt for worker token if missing
+  if (missing.WORKER_TOKEN) {
+    console.log('📋 Worker Token Setup');
+    console.log('   To get your worker token:');
+    console.log('   1. Go to the web UI');
+    console.log('   2. Select your machine');
+    console.log('   3. Click the menu (⋮) next to the machine');
+    console.log('   4. Select "Add Worker"');
+    console.log('   5. Copy the token shown\n');
+
+    workerToken = await promptForInput('Enter worker token: ');
+
+    // Validate token format
+    if (!workerToken.match(/^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+$/)) {
+      throw new Error(
+        'Invalid worker token format. Expected: machine_<machine_id>:worker_<worker_id>'
+      );
+    }
+  }
+
+  // Prompt for Convex URL if missing
+  if (missing.CONVEX_URL) {
+    console.log('\n📡 Convex Backend URL');
+    console.log('   Get this from your Convex dashboard');
+    console.log('   Example: https://your-deployment.convex.cloud\n');
+
+    convexUrl = await promptForInput('Enter Convex URL: ');
+
+    // Validate URL format
+    if (!convexUrl.startsWith('https://')) {
+      throw new Error('Convex URL must start with https://');
+    }
+  }
+
+  // Save to .env file
+  await saveEnvFile(workerToken, convexUrl);
+
+  console.log('\n✅ Configuration saved to .env');
+  console.log('   You can now start the worker\n');
+}
+
+/**
+ * Prompt user for input via stdin.
+ *
+ * @param prompt - Prompt message to display
+ * @returns Promise resolving to user input
+ */
+async function promptForInput(prompt: string): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
   return new Promise((resolve) => {
-    rl.question('Enter machine token: ', (answer) => {
+    rl.question(prompt, (answer) => {
       rl.close();
       resolve(answer.trim());
     });
@@ -94,71 +110,26 @@ export async function promptForToken(): Promise<string> {
 }
 
 /**
- * Save machine token to .env file.
- * Creates or overwrites the .env file with the token.
- * Also adds CONVEX_URL if not already present.
+ * Save environment variables to .env file.
  *
- * @param token - Machine token to save
- * @throws Error if file write fails
- * @example
- * ```typescript
- * await saveToken('abc123:def456');
- * console.log('Token saved!');
- * ```
+ * @param workerToken - Worker authentication token
+ * @param convexUrl - Convex backend URL
  */
-export async function saveToken(token: string): Promise<void> {
-  // Validate token format before saving
-  parseToken(token); // Will throw if invalid
-
+async function saveEnvFile(workerToken: string, convexUrl: string): Promise<void> {
   const envPath = path.join(process.cwd(), '.env');
 
-  // Check if CONVEX_URL is already set
-  const existingConvexUrl = process.env.CONVEX_URL;
-
-  const envContent = `# Machine authentication token
-# Format: <machine_id>:<machine_secret>
-MACHINE_TOKEN=${token}
+  const envContent = `# Worker authentication token
+# Format: machine_<machine_id>:worker_<worker_id>
+# Get this from the web UI by selecting your machine and clicking "Add Worker"
+WORKER_TOKEN=${workerToken}
 
 # Convex backend URL
-# Get this from your Convex dashboard or use the default production URL
-CONVEX_URL=${existingConvexUrl || 'https://your-deployment.convex.cloud'}
+# Get this from your Convex dashboard
+CONVEX_URL=${convexUrl}
 `;
 
   await fs.writeFile(envPath, envContent, 'utf-8');
-  console.log('✅ Machine token saved to .env');
-
-  if (!existingConvexUrl) {
-    console.log('⚠️  Please update CONVEX_URL in .env with your Convex deployment URL\n');
-  } else {
-    console.log('');
-  }
 }
 
-/**
- * Parse machine token into machineId and machineSecret.
- * Validates the token format.
- *
- * @param token - Token to parse (format: <machine_id>:<machine_secret>)
- * @returns Tuple of [machineId, machineSecret]
- * @throws Error if token format is invalid
- * @example
- * ```typescript
- * const [id, secret] = parseToken('abc123:def456');
- * console.log(`ID: ${id}, Secret: ${secret}`);
- * ```
- */
-function parseToken(token: string): [string, string] {
-  const parts = token.split(':');
-
-  if (parts.length !== 2) {
-    throw new Error('Invalid token format. Expected: <machine_id>:<machine_secret>');
-  }
-
-  const [machineId, machineSecret] = parts;
-
-  if (!machineId || !machineSecret) {
-    throw new Error('Invalid token: machine ID and secret cannot be empty');
-  }
-
-  return [machineId, machineSecret];
-}
+// Re-export types and functions from env module
+export { getEnv, loadEnv, parseWorkerConfig, type WorkerConfig } from './env';

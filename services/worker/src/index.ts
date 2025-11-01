@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 
 import { MachineServer } from '@presentation/MachineServer';
-import { loadConfig, promptForToken, saveToken } from './config';
+import { interactiveSetup, loadConfig, loadEnv } from './config';
 
 /**
  * Main entry point for the Assistant Worker Runtime.
  *
  * This CLI application manages:
- * - Machine registration and authentication
- * - Worker (assistant) lifecycle management
+ * - Worker registration and authorization
  * - OpenCode session orchestration
  * - Real-time communication with Convex backend
  *
  * Usage:
- *   pnpm start                    # Start with stored token (or prompt on first run)
+ *   pnpm start                    # Start with stored config (or prompt on first run)
  *   pnpm start --help             # Show help
  */
 
@@ -47,16 +46,22 @@ Usage:
 Options:
   --help, -h             Show this help message
 
-Environment Variables:
-  MACHINE_TOKEN         Machine token (format: <machine_id>:<machine_secret>)
-  CONVEX_URL            Convex backend URL (optional, defaults to production)
+Environment Variables (required):
+  WORKER_TOKEN          Worker authentication token
+                        Format: machine_<machine_id>:worker_<worker_id>
+                        Get this from the web UI by selecting your machine
+                        and clicking "Add Worker" in the action menu
+
+  CONVEX_URL            Convex backend URL
+                        Example: https://your-deployment.convex.cloud
+                        Get this from your Convex dashboard
 
 First-Time Setup:
-  On first run, you will be prompted to enter your machine token.
-  Get your token from the web UI by creating a new machine.
+  On first run, you will be prompted to enter your worker token and
+  Convex URL. These will be saved to a .env file for future runs.
 
 Examples:
-  # Start (will prompt for token on first run)
+  # Start (will prompt for config on first run)
   pnpm start
 
   # Show help
@@ -80,29 +85,31 @@ async function main(): Promise<void> {
 
   console.log('🚀 Starting Opencode Worker...\n');
 
-  // Load or prompt for machine token
+  // Try to load configuration
   let config = await loadConfig();
 
-  if (!config.machineToken) {
-    console.log('No machine token found.');
-    const token = await promptForToken();
-
+  // If config is missing or invalid, run interactive setup
+  if (!config) {
     try {
-      await saveToken(token);
+      await interactiveSetup();
+      // Reload environment after setup
+      loadEnv();
       config = await loadConfig();
     } catch (error) {
-      console.error(
-        '❌ Invalid token format:',
-        error instanceof Error ? error.message : String(error)
-      );
+      console.error('\n❌ Setup failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }
 
-  if (!config.machineId || !config.machineSecret) {
-    console.error('❌ Failed to parse machine token');
+  // Validate config was loaded successfully
+  if (!config) {
+    console.error('❌ Failed to load configuration after setup');
     process.exit(1);
   }
+
+  console.log(`📍 Machine ID: ${config.machineId}`);
+  console.log(`🔧 Worker ID: ${config.workerId}`);
+  console.log(`🌐 Convex URL: ${config.convexUrl}\n`);
 
   const server = new MachineServer();
 

@@ -39,55 +39,52 @@ export class MachineServer {
   private _convexClient: ConvexClientAdapter | null = null;
 
   /**
-   * Starts the machine server and connects to Convex.
+   * Starts the worker and connects to Convex.
    *
    * Flow:
-   * 1. Authenticate with Convex
-   * 2. Sync state from Convex (workers, sessions)
-   * 3. Initialize workers
-   * 4. Subscribe to Convex events
-   * 5. Start session lifecycle monitor
+   * 1. Register with Convex and check authorization
+   * 2. Wait for approval if pending
+   * 3. Start heartbeat once approved
+   * 4. TODO: Initialize OpenCode sessions
+   * 5. TODO: Subscribe to Convex events
    *
-   * @param config - Worker configuration with machine credentials
-   * @throws Error if authentication fails or configuration is invalid
+   * @param config - Worker configuration with credentials
+   * @throws Error if registration fails or configuration is invalid
    */
   async start(config: WorkerConfig): Promise<void> {
     if (this._isRunning) {
-      throw new Error('Machine server is already running');
+      throw new Error('Worker is already running');
     }
 
-    if (!config.machineId || !config.machineSecret) {
-      throw new Error('Machine ID and secret are required');
-    }
+    console.log('🔐 Registering worker with Convex...');
 
-    // Get Convex URL from environment
-    const convexUrl = process.env.CONVEX_URL;
-    if (!convexUrl) {
-      throw new Error(
-        'CONVEX_URL environment variable is required. Please set it in your .env file.'
-      );
-    }
-
-    console.log('🔐 Authenticating with Convex...');
-
-    // Store machine token
-    this._machineToken = `${config.machineId}:${config.machineSecret}` as unknown as MachineToken;
-
-    // Create Convex client and authenticate
-    this._convexClient = new ConvexClientAdapter(convexUrl, config);
+    // Create Convex client
+    this._convexClient = new ConvexClientAdapter(config.convexUrl, config);
 
     try {
-      const machineInfo = await this._convexClient.authenticate();
-      console.log(`✅ Authenticated as machine: ${machineInfo.name} (${machineInfo.machineId})`);
+      // Register and check approval status
+      const registration = await this._convexClient.register();
+
+      if (!registration.approved) {
+        // Wait for approval
+        await this._convexClient.waitForApproval();
+      } else {
+        console.log('✅ Worker already approved\n');
+      }
+
+      console.log(`Worker ID: ${registration.workerId}`);
+      if (registration.name) {
+        console.log(`Worker Name: ${registration.name}`);
+      }
     } catch (error) {
       throw new Error(
-        `Failed to authenticate with Convex: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to register worker: ${error instanceof Error ? error.message : String(error)}`
       );
     }
 
     // TODO: Implement remaining startup flow
     // 2. Sync state
-    // 3. Initialize workers
+    // 3. Initialize OpenCode sessions
     // 4. Subscribe to events
     // 5. Start monitors
 
