@@ -1,6 +1,8 @@
 'use client';
 
+import { CheckCircle2Icon } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,7 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCreateMachine } from '../hooks/useCreateMachine';
 import type { MachineRegistration } from '../types';
-import { MachineTokenDisplay } from './MachineTokenDisplay';
 
 /**
  * Props for CreateMachineDialog component.
@@ -28,7 +29,8 @@ export interface CreateMachineDialogProps {
 
 /**
  * Dialog component for creating a new machine.
- * Shows a form to enter machine name, then displays the registration token upon success.
+ * Shows a form to enter machine name, then displays success message.
+ * Note: Machines no longer have tokens - workers authenticate individually.
  *
  * @example
  * ```typescript
@@ -121,11 +123,22 @@ export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogP
             <DialogHeader>
               <DialogTitle>Machine Created Successfully!</DialogTitle>
               <DialogDescription>
-                Use this token to register your machine. Keep it secure.
+                Your machine "{registration.name}" has been created. You can now add workers to it.
               </DialogDescription>
             </DialogHeader>
 
-            <MachineTokenDisplay token={registration.token} machineId={registration.machineId} />
+            <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+              <CheckCircle2Icon className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                <p className="font-medium mb-2">Next Steps:</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm">
+                  <li>Navigate to the machine settings</li>
+                  <li>Click "Add new worker" to create a worker token</li>
+                  <li>Use the worker token to start your worker process</li>
+                  <li>Approve the worker when it requests authorization</li>
+                </ol>
+              </AlertDescription>
+            </Alert>
 
             <DialogFooter>
               <Button onClick={handleClose}>Done</Button>

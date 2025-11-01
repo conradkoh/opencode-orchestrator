@@ -234,15 +234,42 @@ export default defineSchema({
   /**
    * Machine registrations for the assistant orchestrator.
    * Tracks physical machines that can host workers/assistants.
-   * Machine ID and secret are generated client-side using nanoid.
+   * Machine ID is generated client-side using nanoid.
+   * Note: Machines no longer have authentication tokens - workers authenticate individually.
    */
   machines: defineTable({
     machineId: v.string(), // Client-generated nanoid (not Convex _id)
-    secret: v.string(), // For machine authentication
     name: v.string(), // User-friendly name (e.g., "MacBook Pro", "Desktop PC")
     status: v.union(v.literal('online'), v.literal('offline')), // Connection status
-    rootDirectory: v.optional(v.string()), // Set during machine registration from worker
     lastHeartbeat: v.number(), // Timestamp of last heartbeat/activity
-    userId: v.optional(v.id('users')), // Owner of this machine (TODO: implement)
-  }).index('by_machine_id', ['machineId']),
+    userId: v.id('users'), // Owner of this machine
+  })
+    .index('by_machine_id', ['machineId'])
+    .index('by_user_id', ['userId']),
+
+  /**
+   * Worker registrations for individual assistant instances.
+   * Each worker requires explicit user approval before it can start.
+   * Workers are tied to a specific machine and have their own authentication token.
+   */
+  workers: defineTable({
+    workerId: v.string(), // Client-generated nanoid
+    machineId: v.string(), // Reference to parent machine
+    name: v.optional(v.string()), // Optional user-friendly name
+    status: v.union(
+      v.literal('pending_authorization'),
+      v.literal('ready'),
+      v.literal('online'),
+      v.literal('offline')
+    ),
+    createdAt: v.number(), // When worker was created
+    approvedAt: v.optional(v.number()), // When worker was approved
+    approvedBy: v.optional(v.id('users')), // User who approved
+    lastHeartbeat: v.optional(v.number()), // Last activity timestamp
+  })
+    .index('by_worker_id', ['workerId'])
+    .index('by_machine_id', ['machineId'])
+    .index('by_machine_and_worker', ['machineId', 'workerId'])
+    .index('by_status', ['status'])
+    .index('by_machine_and_status', ['machineId', 'status']),
 });

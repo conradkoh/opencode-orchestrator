@@ -62,73 +62,71 @@ Backend --> Frontend: Real-time update (if user online)
 
 ### Flow 3: Worker Registration and Usage
 
-Complete flow from machine registration to executing worker tasks.
+Complete flow from machine registration to executing worker tasks with individual worker token authentication.
 
 ```plantuml
 @startuml
 actor User
 participant "Next.JS\nWebapp" as Frontend
 participant "Convex\nBackend" as Backend
-participant "Machine\nProcess" as Machine
-participant "Opencode\nWorker" as Worker
+participant "Worker\nProcess" as Worker
 
 == Machine Registration ==
 User -> Frontend: Add machine (provide name)
 Frontend -> Backend: Create machine registration
-Backend -> Frontend: Return registration key
-Frontend -> User: Display registration key
+Backend -> Frontend: Return machine created
+Frontend -> User: Show machine in list
 
-User -> Machine: Clone repo & run start
-Machine -> Machine: Check for MACHINE_ID
-Machine -> User: Prompt for registration key
-User -> Machine: Provide registration key
-User -> Machine: Provide root directory
-Machine -> Backend: Register with key
-Backend -> Machine: Return MACHINE_ID & secret
-Machine -> Machine: Store MACHINE_ID & secret
-Backend --> Frontend: Update machine status (online)
-Frontend -> User: Show machine online
+== Worker Token Generation ==
+User -> Frontend: Navigate to machine settings
+User -> Frontend: Click "Add new worker"
+Frontend -> Backend: workers.create(machineId, workerId, name)
+Backend -> Backend: Create worker record (status: pending_authorization)
+Backend -> Frontend: Return worker token
+Frontend -> User: Display token: machine_<id>:worker_<id>
 
-== Directory Operations ==
-User -> Frontend: Browse directory
-Frontend -> Backend: Request directory listing
-Backend -> Machine: Query directory structure
-Machine -> Backend: Return directory tree
-Backend -> Frontend: Display directory tree
+== Worker Startup & Authorization ==
+User -> Worker: Start worker with WORKER_TOKEN
+Worker -> Worker: Parse token (machineId, workerId)
+Worker -> Backend: workers.register(machineId, workerId)
+Backend -> Backend: Check approval status
 
-User -> Frontend: Create folder "repos"
-Frontend -> Backend: Create folder command
-Backend -> Machine: Execute mkdir
-Machine -> Backend: Confirm creation
+alt Not Yet Approved
+    Backend -> Worker: { status: pending_authorization, approved: false }
+    Worker -> Worker: Enter pending state
+    Worker -> User: Display "Waiting for authorization..."
+    Worker -> Backend: Poll for approval every 5s
 
-User -> Frontend: Execute git clone command
-Frontend -> Backend: Send git clone command
-Backend -> Machine: Execute git clone
-Machine -> Backend: Update progress/completion
+    User -> Frontend: Navigate to machine settings
+    Frontend -> Backend: Subscribe to workers.listPending(machineId)
+    Backend -> Frontend: Show pending worker
+    User -> Frontend: Click "Approve" button
+    Frontend -> Backend: workers.approve(workerId)
+    Backend -> Backend: Update status to 'ready'
+    Backend -> Worker: Approval notification
+    Worker -> Worker: Transition to ready state
+else Already Approved
+    Backend -> Worker: { status: ready, approved: true }
+end
 
-== Worker Setup ==
-User -> Frontend: Select folder & "Add Worker"
-Frontend -> Backend: worker.register(machineId)
-Backend -> Backend: Create worker record
-Backend --> Frontend: Update machine (1 worker)
-Frontend -> User: Show worker registered
+Worker -> Backend: Update status to 'online'
+Backend --> Frontend: Worker online notification
+Frontend -> User: Show worker as online
 
 == Chat Session ==
 User -> Frontend: Select worker & start chat
 Frontend -> Backend: worker.chat.startSession(machineId, workerId)
-Backend -> Machine: Start session request
-Machine -> Worker: Start new opencode process
+Backend -> Worker: Start session request
+Worker -> Worker: Start new opencode process
 Worker -> Worker: Initialize client
-Worker -> Machine: Client ready
-Machine -> Backend: Session started
+Worker -> Backend: Session started
 Backend -> Frontend: Session ready
 
 == Message Processing ==
 User -> Frontend: Send message
 Frontend -> Backend: worker.chat.sendMessage(chatSessionId, message)
-Backend --> Machine: Message notification
-Machine -> Machine: Route to worker by session ID
-Machine -> Worker: Pass message to opencode session
+Backend --> Worker: Message notification
+Worker -> Worker: Route to opencode session
 Worker -> Worker: Process with opencode
 
 loop Streaming Response
@@ -146,15 +144,25 @@ Backend --> Frontend: Complete message available
 
 **Machine Registration**
 
-- Registration key-based authentication
-- Persistent storage of MACHINE_ID and secret
-- Root directory configuration for sandboxed operations
+- Machines are created from the web UI with a user-friendly name
+- Each machine belongs to a specific user
+- Machines track online/offline status via heartbeat
+- No direct authentication token - workers authenticate individually
 
-**Worker Management**
+**Worker Token Management**
 
-- Workers are associated with specific directories on machines
-- `worker.register(machineId)` creates worker instance
-- Multiple workers can exist per machine
+- Each worker gets a unique token: `machine_<machineId>:worker_<workerId>`
+- Workers require explicit user approval before they can start
+- Token format clearly identifies both machine and worker
+- Individual worker compromise doesn't affect other workers or the machine
+
+**Worker Authorization Flow**
+
+- New workers start in `pending_authorization` state
+- Worker polls backend every 5 seconds for approval
+- User approves workers through machine settings UI
+- Approved workers transition to `ready` state, then `online` when active
+- Workers can be individually revoked without affecting others
 
 **Chat Interface**
 
@@ -173,13 +181,21 @@ Backend --> Frontend: Complete message available
 
 ### Authentication & Security
 
-**Machine Token**
+**Worker Token Authentication**
 
-- Format: `<machine_id>:<machine_secret>`
-- Generated automatically when user creates a machine from the UI
-- Token is one-time use during registration
-- Machine authenticates to Convex using the combined token
-- Both ID and secret are generated client-side using nanoid
+- Format: `machine_<machine_id>:worker_<worker_id>`
+- Each worker gets a unique token generated from the web UI
+- Workers require explicit user approval before they can start
+- Individual worker compromise doesn't affect the entire cluster
+- Tokens are stored in worker's `.env` file as `WORKER_TOKEN`
+
+**Security Benefits**
+
+- **Granular Control**: Each worker can be approved/revoked independently
+- **Reduced Blast Radius**: Compromised token only affects one worker
+- **Audit Trail**: Track which user approved which worker and when
+- **Explicit Authorization**: No worker can start without user approval
+- **Machine Isolation**: Machine record has no authentication credentials
 
 ### Worker Identity & Concurrency
 
@@ -202,22 +218,23 @@ Backend --> Frontend: Complete message available
 
 ### State Management & Recovery
 
-**Stateless Machine Process**
+**Stateless Worker Process**
 
-- All worker registrations are stored in Convex
-- Machine state is fully recoverable using only the machine token
-- Machine process can die and restart without data loss
-- On restart, machine queries Convex to restore:
-  - List of registered workers
+- All worker registrations and state are stored in Convex
+- Worker state is fully recoverable using only the worker token
+- Worker process can die and restart without data loss
+- On restart, worker queries Convex to restore:
+  - Authorization status
   - Active chat sessions
   - Pending tasks
 
 **Implications**
 
 - Convex is the source of truth for all orchestration state
-- Machines are stateless execution environments
-- Graceful recovery from machine crashes
-- Simplified machine deployment (no local state to backup)
+- Workers are stateless execution environments
+- Graceful recovery from worker crashes
+- Simplified worker deployment (no local state to backup)
+- Workers automatically resume approved status on restart
 
 ### ID Allocation Strategy
 
@@ -225,11 +242,11 @@ Backend --> Frontend: Complete message available
 
 The system uses nanoid for all primary identifiers to maintain control over ID generation and avoid dependency on Convex's auto-generated IDs.
 
-| Entity       | ID Source    | Generated By      | Notes                                  |
-| ------------ | ------------ | ----------------- | -------------------------------------- |
-| Machine      | `machine_id` | Frontend (webapp) | Part of machine token                  |
-| Worker       | `worker_id`  | Machine process   | Reported to Convex during registration |
-| Chat Session | `session_id` | Opencode          | Source of truth for session identity   |
+| Entity       | ID Source    | Generated By      | Notes                                |
+| ------------ | ------------ | ----------------- | ------------------------------------ |
+| Machine      | `machine_id` | Frontend (webapp) | Used in worker token                 |
+| Worker       | `worker_id`  | Frontend (webapp) | Part of worker token                 |
+| Chat Session | `session_id` | Opencode          | Source of truth for session identity |
 
 **Rationale**
 

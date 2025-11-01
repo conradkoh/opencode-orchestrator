@@ -24,13 +24,13 @@ export interface Machine {
 
 /**
  * Registration information returned when creating a new machine.
- * Contains the machine token needed for initial machine registration.
+ * Note: Machines no longer have authentication tokens - workers authenticate individually.
  */
 export interface MachineRegistration {
   /** Unique identifier for the machine */
   machineId: string;
-  /** Registration token in format `<machine_id>:<machine_secret>` */
-  token: string;
+  /** User-friendly name for the machine */
+  name: string;
 }
 
 /**
@@ -172,5 +172,131 @@ export interface AssistantChatReturn {
   /** Whether any operation is in progress */
   isLoading: boolean;
   /** Error object if operation failed, null otherwise */
+  error: Error | null;
+}
+
+// Worker-related types
+
+/**
+ * Represents a worker instance that requires authentication.
+ * Workers are individual processes that need explicit user approval.
+ */
+export interface Worker {
+  /** Unique identifier for the worker (nanoid) */
+  workerId: string;
+  /** ID of the machine this worker belongs to */
+  machineId: string;
+  /** Optional user-friendly name for the worker */
+  name?: string;
+  /** Current authorization/connection status */
+  status: 'pending_authorization' | 'ready' | 'online' | 'offline';
+  /** Timestamp when the worker was created */
+  createdAt: number;
+  /** Timestamp when the worker was approved (if approved) */
+  approvedAt?: number;
+  /** Timestamp of last heartbeat/activity from the worker */
+  lastHeartbeat?: number;
+}
+
+/**
+ * Represents a worker pending authorization.
+ */
+export interface PendingWorker {
+  /** Unique identifier for the worker */
+  workerId: string;
+  /** ID of the machine this worker belongs to */
+  machineId: string;
+  /** Optional user-friendly name for the worker */
+  name?: string;
+  /** Status is always pending_authorization for this type */
+  status: 'pending_authorization';
+  /** Timestamp when the worker was created */
+  createdAt: number;
+}
+
+/**
+ * Registration information returned when creating a new worker.
+ * Contains the worker token needed for worker authentication.
+ */
+export interface WorkerRegistration {
+  /** Unique identifier for the worker */
+  workerId: string;
+  /** Worker token in format `machine_<machine_id>:worker_<worker_id>` */
+  token: string;
+}
+
+/**
+ * Result data from fetching workers for a machine.
+ */
+export interface WorkersData {
+  /** Array of workers, or undefined if still loading */
+  workers: Worker[] | undefined;
+  /** Whether the fetch operation is in progress */
+  loading: boolean;
+  /** Error object if fetch failed, null otherwise */
+  error: Error | null;
+}
+
+/**
+ * Result data from fetching pending workers for a machine.
+ */
+export interface PendingWorkersData {
+  /** Array of pending workers, or undefined if still loading */
+  workers: PendingWorker[] | undefined;
+  /** Whether the fetch operation is in progress */
+  loading: boolean;
+  /** Error object if fetch failed, null otherwise */
+  error: Error | null;
+}
+
+/**
+ * Return value from the useCreateWorker hook.
+ * Provides worker creation function and loading state.
+ */
+export interface CreateWorkerReturn {
+  /**
+   * Creates a new worker for the specified machine.
+   * @param machineId - ID of the machine to create worker for
+   * @param name - Optional user-friendly name for the worker
+   * @returns Promise resolving to worker registration token
+   */
+  createWorker: (machineId: string, name?: string) => Promise<WorkerRegistration>;
+  /** Whether worker creation is in progress */
+  isCreating: boolean;
+  /** Error object if creation failed, null otherwise */
+  error: Error | null;
+}
+
+/**
+ * Return value from the useApproveWorker hook.
+ * Provides worker approval function and loading state.
+ */
+export interface ApproveWorkerReturn {
+  /**
+   * Approves a pending worker authorization request.
+   * @param workerId - ID of the worker to approve
+   * @returns Promise that resolves when worker is approved
+   */
+  approveWorker: (workerId: string) => Promise<void>;
+  /** Whether approval is in progress */
+  isApproving: boolean;
+  /** Error object if approval failed, null otherwise */
+  error: Error | null;
+}
+
+/**
+ * Return value from the useRejectWorker hook.
+ * Provides worker rejection function and loading state.
+ */
+export interface RejectWorkerReturn {
+  /**
+   * Rejects a pending worker authorization request.
+   * @param workerId - ID of the worker to reject
+   * @returns Promise that resolves when worker is rejected
+   */
+  rejectWorker: (workerId: string) => Promise<void>;
+  /** Whether rejection is in progress */
+  isRejecting: boolean;
+  /** Error object if rejection failed, null otherwise */
   error: Error | null;
 }

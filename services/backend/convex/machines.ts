@@ -1,22 +1,21 @@
 import { v } from 'convex/values';
 import { SessionIdArg } from 'convex-helpers/server/sessions';
 import { getAuthUserOptional } from '../modules/auth/getAuthUser';
-import { mutation, query } from './_generated/server';
+import { internalMutation, mutation, query } from './_generated/server';
 
 /**
  * Create a new machine registration.
  * Called from the web UI when user adds a new machine.
+ * Note: Machines no longer have authentication tokens - workers authenticate individually.
  *
  * @param machineId - Client-generated nanoid
- * @param secret - Client-generated nanoid for authentication
  * @param name - User-friendly machine name
- * @returns Machine registration info with combined token
+ * @returns Machine registration info
  */
 export const create = mutation({
   args: {
     ...SessionIdArg,
     machineId: v.string(),
-    secret: v.string(),
     name: v.string(),
   },
   handler: async (ctx, args) => {
@@ -39,7 +38,6 @@ export const create = mutation({
     // Create machine record
     await ctx.db.insert('machines', {
       machineId: args.machineId,
-      secret: args.secret,
       name: args.name,
       status: 'offline',
       lastHeartbeat: Date.now(),
@@ -49,23 +47,21 @@ export const create = mutation({
     // Return registration info
     return {
       machineId: args.machineId,
-      token: `${args.machineId}:${args.secret}`,
+      name: args.name,
     };
   },
 });
 
 /**
- * Authenticate a machine and update its status to online.
- * Called by the worker process on startup.
+ * Update machine status based on worker activity.
+ * Machine status is automatically derived from worker states.
+ * This is called internally when workers update their status.
  *
  * @param machineId - Machine identifier
- * @param secret - Machine secret for authentication
- * @returns Machine details if authentication successful
  */
-export const authenticate = mutation({
+export const updateMachineStatus = internalMutation({
   args: {
     machineId: v.string(),
-    secret: v.string(),
   },
   handler: async (ctx, args) => {
     // Find machine by ID
@@ -75,94 +71,20 @@ export const authenticate = mutation({
       .first();
 
     if (!machine) {
-      throw new Error('Machine not found. Please check your machine token.');
+      return; // Machine doesn't exist, nothing to update
     }
 
-    // Verify secret
-    if (machine.secret !== args.secret) {
-      throw new Error('Invalid machine secret. Please check your machine token.');
-    }
-
-    // Update status to online
-    await ctx.db.patch(machine._id, {
-      status: 'online',
-      lastHeartbeat: Date.now(),
-    });
-
-    return {
-      success: true,
-      machineId: machine.machineId,
-      name: machine.name,
-    };
-  },
-});
-
-/**
- * Update machine heartbeat to maintain online status.
- * Called periodically by the worker process.
- *
- * @param machineId - Machine identifier
- * @param secret - Machine secret for authentication
- */
-export const heartbeat = mutation({
-  args: {
-    machineId: v.string(),
-    secret: v.string(),
-  },
-  handler: async (ctx, args) => {
-    // Find machine by ID
-    const machine = await ctx.db
-      .query('machines')
+    // Check if any workers are online
+    const workers = await ctx.db
+      .query('workers')
       .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
-      .first();
+      .collect();
 
-    if (!machine) {
-      throw new Error('Machine not found');
-    }
+    const hasOnlineWorkers = workers.some((w) => w.status === 'online');
 
-    // Verify secret
-    if (machine.secret !== args.secret) {
-      throw new Error('Invalid machine secret');
-    }
-
-    // Update heartbeat timestamp
+    // Update machine status
     await ctx.db.patch(machine._id, {
-      lastHeartbeat: Date.now(),
-    });
-  },
-});
-
-/**
- * Update machine status to offline.
- * Called by the worker process on graceful shutdown.
- *
- * @param machineId - Machine identifier
- * @param secret - Machine secret for authentication
- */
-export const setOffline = mutation({
-  args: {
-    machineId: v.string(),
-    secret: v.string(),
-  },
-  handler: async (ctx, args) => {
-    // Find machine by ID
-    const machine = await ctx.db
-      .query('machines')
-      .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
-      .first();
-
-    if (!machine) {
-      throw new Error('Machine not found');
-    }
-
-    // Verify secret
-    if (machine.secret !== args.secret) {
-      throw new Error('Invalid machine secret');
-    }
-
-    // Update status to offline
-    await ctx.db.patch(machine._id, {
-      status: 'offline',
+      status: hasOnlineWorkers ? 'online' : 'offline',
       lastHeartbeat: Date.now(),
     });
   },
@@ -224,18 +146,29 @@ export const list = query({
     }
 
     // Get all machines for this user
-    const machines = await ctx.db.query('machines').collect();
+    const machines = await ctx.db
+      .query('machines')
+      .withIndex('by_user_id', (q) => q.eq('userId', user._id))
+      .collect();
 
-    // Filter by userId (TODO: add index for better performance)
-    const userMachines = machines.filter((m) => m.userId === user._id);
+    // Get worker counts for each machine
+    const machinesWithCounts = await Promise.all(
+      machines.map(async (machine) => {
+        const workers = await ctx.db
+          .query('workers')
+          .withIndex('by_machine_id', (q) => q.eq('machineId', machine.machineId))
+          .collect();
 
-    // Map to frontend format
-    return userMachines.map((machine) => ({
-      machineId: machine.machineId,
-      name: machine.name,
-      status: machine.status,
-      lastSeen: machine.lastHeartbeat,
-      assistantCount: 0, // TODO: Count from workers table when implemented
-    }));
+        return {
+          machineId: machine.machineId,
+          name: machine.name,
+          status: machine.status,
+          lastSeen: machine.lastHeartbeat,
+          assistantCount: workers.length,
+        };
+      })
+    );
+
+    return machinesWithCounts;
   },
 });

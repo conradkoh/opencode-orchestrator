@@ -26,6 +26,7 @@ import type * as migration from "../migration.js";
 import type * as presentations from "../presentations.js";
 import type * as serviceDesk from "../serviceDesk.js";
 import type * as system_auth_google from "../system/auth/google.js";
+import type * as workers from "../workers.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   presentations: typeof presentations;
   serviceDesk: typeof serviceDesk;
   "system/auth/google": typeof system_auth_google;
+  workers: typeof workers;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

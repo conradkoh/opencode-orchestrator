@@ -8,7 +8,8 @@ import type { CreateMachineReturn, MachineRegistration } from '../types';
 
 /**
  * Hook for creating new machines using Convex backend.
- * Generates machine ID and secret client-side using nanoid.
+ * Generates machine ID client-side using nanoid.
+ * Note: Machines no longer have authentication tokens - workers authenticate individually.
  *
  * @returns CreateMachineReturn with createMachine function and loading state
  * @example
@@ -17,7 +18,7 @@ import type { CreateMachineReturn, MachineRegistration } from '../types';
  * const handleCreate = async () => {
  *   try {
  *     const registration = await createMachine("My Machine");
- *     console.log("Token:", registration.token);
+ *     console.log("Machine created:", registration.machineId);
  *   } catch (err) {
  *     console.error("Failed:", err);
  *   }
@@ -31,7 +32,7 @@ export function useCreateMachine(): CreateMachineReturn {
 
   /**
    * Creates a new machine with the given name.
-   * Generates a machine ID and secret, then returns the registration token.
+   * Generates a machine ID client-side.
    */
   const createMachine = useCallback(
     async (name: string): Promise<MachineRegistration> => {
@@ -39,20 +40,18 @@ export function useCreateMachine(): CreateMachineReturn {
       setError(null);
 
       try {
-        // Generate machine ID and secret client-side
+        // Generate machine ID client-side
         const machineId = nanoid();
-        const secret = nanoid();
 
         // Call Convex mutation
         const result = await createMachineMutation({
           machineId,
-          secret,
           name,
         });
 
         return {
           machineId: result.machineId,
-          token: result.token,
+          name: result.name,
         };
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to create machine');
