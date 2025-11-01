@@ -114,31 +114,55 @@ export interface AssistantsData {
 export interface ChatMessage {
   /** Unique identifier for the message */
   id: string;
+  /** Session this message belongs to */
+  sessionId: string;
   /** Role of the message sender */
   role: 'user' | 'assistant' | 'system';
   /** Message content/text */
   content: string;
   /** Timestamp when the message was created */
   timestamp: number;
-  /** Whether the message is currently being streamed */
+  /** Whether the message is complete (false while streaming) */
+  completed: boolean;
+  /** Whether the message is currently being streamed (frontend-only flag) */
   isStreaming?: boolean;
 }
 
 /**
- * Represents a chat session with an assistant.
- * Sessions are created per assistant and can be restored after idle timeout.
+ * Represents a chat session with a worker.
+ * Sessions are created per worker and can be restored after idle timeout.
  */
 export interface ChatSession {
-  /** Unique identifier for the session (from assistant runtime) */
+  /** Unique identifier for the session */
   sessionId: string;
-  /** ID of the assistant this session belongs to */
-  assistantId: string;
+  /** ID of the worker handling this session */
+  workerId: string;
   /** AI model being used for this session */
   model: string;
   /** Current status of the session */
   status: 'active' | 'idle' | 'terminated';
   /** Timestamp when the session was created */
   createdAt: number;
+  /** Timestamp of last activity */
+  lastActivity: number;
+}
+
+/**
+ * Represents a chunk of streaming response.
+ */
+export interface ChatChunk {
+  /** Unique identifier for the chunk */
+  chunkId: string;
+  /** Message this chunk belongs to */
+  messageId: string;
+  /** Session this chunk belongs to */
+  sessionId: string;
+  /** The text chunk */
+  chunk: string;
+  /** Order of this chunk in the message */
+  sequence: number;
+  /** Timestamp when chunk was received */
+  timestamp: number;
 }
 
 /**
