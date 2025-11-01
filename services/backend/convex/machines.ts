@@ -55,6 +55,44 @@ export const create = mutation({
 });
 
 /**
+ * Delete a machine by ID.
+ * Only the owner can delete their machine.
+ *
+ * @param machineId - ID of the machine to delete
+ */
+export const deleteMachine = mutation({
+  args: {
+    ...SessionIdArg,
+    machineId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Verify user is authenticated
+    const user = await getAuthUserOptional(ctx, args);
+    if (!user) {
+      throw new Error('Unauthorized: Must be logged in to delete a machine');
+    }
+
+    // Find the machine
+    const machine = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
+      .first();
+
+    if (!machine) {
+      throw new Error('Machine not found');
+    }
+
+    // Verify ownership
+    if (machine.userId !== user._id) {
+      throw new Error('Unauthorized: You can only delete your own machines');
+    }
+
+    // Delete the machine
+    await ctx.db.delete(machine._id);
+  },
+});
+
+/**
  * List all machines for the current user.
  * Returns machines with their status and basic info.
  *

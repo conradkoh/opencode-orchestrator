@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button';
 import { useAssistantChat } from '../hooks/useAssistantChat';
 import { useAssistantSessions } from '../hooks/useAssistantSessions';
 import { useAssistants } from '../hooks/useAssistants';
+import { useDeleteMachine } from '../hooks/useDeleteMachine';
+import { useMachines } from '../hooks/useMachines';
 import { AssistantSelector } from './AssistantSelector';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
+import { MachineSelector } from './MachineSelector';
 import { ModelSelector } from './ModelSelector';
 import { SessionList } from './SessionList';
 
@@ -23,7 +26,11 @@ import { SessionList } from './SessionList';
  * ```
  */
 export function ChatInterface() {
-  const { assistants, loading: assistantsLoading } = useAssistants();
+  const { machines, loading: machinesLoading } = useMachines();
+  const { deleteMachine } = useDeleteMachine();
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+
+  const { assistants, loading: assistantsLoading } = useAssistants(selectedMachineId || undefined);
   const [selectedAssistantId, setSelectedAssistantId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [showNewSession, setShowNewSession] = useState(false);
@@ -42,6 +49,15 @@ export function ChatInterface() {
   const { session, startSession, restoreSession, endSession, messages, sendMessage, isLoading } =
     useAssistantChat(selectedAssistantId);
 
+  // Reset assistant selection when machine changes
+  useEffect(() => {
+    if (selectedMachineId !== null) {
+      setSelectedAssistantId(null);
+      setShowNewSession(false);
+      setSelectedModel(null);
+    }
+  }, [selectedMachineId]);
+
   // Reset state when assistant changes
   useEffect(() => {
     if (selectedAssistantId) {
@@ -56,6 +72,40 @@ export function ChatInterface() {
       setSelectedModel(availableModels[0]);
     }
   }, [showNewSession, availableModels, selectedModel]);
+
+  /**
+   * Handles machine selection change.
+   */
+  const handleMachineChange = useCallback((machineId: string) => {
+    setSelectedMachineId(machineId);
+  }, []);
+
+  /**
+   * Handles machine deletion.
+   */
+  const handleDeleteMachine = useCallback(
+    async (machineId: string) => {
+      if (!confirm('Are you sure you want to delete this machine? This action cannot be undone.')) {
+        return;
+      }
+      try {
+        await deleteMachine(machineId);
+        if (selectedMachineId === machineId) {
+          setSelectedMachineId(null);
+        }
+      } catch (error) {
+        console.error('Failed to delete machine:', error);
+      }
+    },
+    [deleteMachine, selectedMachineId]
+  );
+
+  /**
+   * Handles assistant selection change.
+   */
+  const handleAssistantChange = useCallback((assistantId: string) => {
+    setSelectedAssistantId(assistantId);
+  }, []);
 
   /**
    * Handles starting a new chat session with the selected model.
@@ -135,51 +185,73 @@ export function ChatInterface() {
     setSelectedModel(model);
   }, []);
 
-  /**
-   * Handles assistant selection change.
-   */
-  const handleAssistantChange = useCallback((assistantId: string) => {
-    setSelectedAssistantId(assistantId);
-  }, []);
-
   const canSendMessage = useMemo(() => !!session && !isLoading, [session, isLoading]);
 
   return (
     <div className="flex h-full flex-col gap-4">
-      {/* Top Header - Assistant Selection */}
+      {/* Machine Selection */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <ServerIcon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Select Assistant</span>
+          <span className="text-sm font-medium text-foreground">Select Machine</span>
         </div>
-        <AssistantSelector
-          assistants={assistants || []}
-          selectedAssistantId={selectedAssistantId}
-          onAssistantChange={handleAssistantChange}
-          disabled={assistantsLoading || !!session}
+        <MachineSelector
+          machines={machines || []}
+          selectedMachineId={selectedMachineId}
+          onMachineChange={handleMachineChange}
+          onDeleteMachine={handleDeleteMachine}
+          disabled={machinesLoading || !!session}
         />
-
-        {selectedAssistant && !session && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant={selectedAssistant.status === 'online' ? 'default' : 'secondary'}
-              className="gap-1.5"
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  selectedAssistant.status === 'online'
-                    ? 'bg-green-500 dark:bg-green-400'
-                    : 'bg-gray-400 dark:bg-gray-500'
-                }`}
-              />
-              {selectedAssistant.status === 'online' ? 'Online' : 'Offline'}
-            </Badge>
-            <span className="text-xs text-muted-foreground font-mono">
-              {selectedAssistant.displayName}
-            </span>
-          </div>
-        )}
       </div>
+
+      {/* Assistant Selection - Only show if machine is selected and has workers */}
+      {selectedMachineId && assistants && assistants.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ServerIcon className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Select Assistant</span>
+          </div>
+          <AssistantSelector
+            assistants={assistants}
+            selectedAssistantId={selectedAssistantId}
+            onAssistantChange={handleAssistantChange}
+            disabled={assistantsLoading || !!session}
+          />
+
+          {selectedAssistant && !session && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant={selectedAssistant.status === 'online' ? 'default' : 'secondary'}
+                className="gap-1.5"
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    selectedAssistant.status === 'online'
+                      ? 'bg-green-500 dark:bg-green-400'
+                      : 'bg-gray-400 dark:bg-gray-500'
+                  }`}
+                />
+                {selectedAssistant.status === 'online' ? 'Online' : 'Offline'}
+              </Badge>
+              <span className="text-xs text-muted-foreground font-mono">
+                {selectedAssistant.displayName}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state for machine with no workers */}
+      {selectedMachineId && assistants && assistants.length === 0 && !session && (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-border bg-background p-8">
+          <div className="text-center space-y-2">
+            <p className="text-sm font-medium text-foreground">No workers registered</p>
+            <p className="text-xs text-muted-foreground">
+              Register a worker on this machine to start chatting
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Chat Area or Session List */}
       {session ? (
