@@ -1,7 +1,7 @@
 'use client';
 
+import { api } from '@workspace/backend/convex/_generated/api';
 import { useSessionQuery } from 'convex-helpers/react/sessions';
-import { api } from '@/convex/_generated/api';
 import type { MachinesData } from '../types';
 
 /**

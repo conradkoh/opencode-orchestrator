@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { SessionIdArg } from 'convex-helpers/server/sessions';
+import { getAuthUserOptional } from '../modules/auth/getAuthUser';
 import { mutation, query } from './_generated/server';
-import { getUserFromSessionId } from './modules/auth/getAuthUser';
 
 /**
  * Create a new machine registration.
@@ -21,7 +21,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     // Verify user is authenticated
-    const user = await getUserFromSessionId(ctx, args.sessionId);
+    const user = await getAuthUserOptional(ctx, args);
     if (!user) {
       throw new Error('Unauthorized: Must be logged in to create a machine');
     }
@@ -66,7 +66,7 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     // Verify user is authenticated
-    const user = await getUserFromSessionId(ctx, args.sessionId);
+    const user = await getAuthUserOptional(ctx, args);
     if (!user) {
       return [];
     }

@@ -1,9 +1,9 @@
 'use client';
 
+import { api } from '@workspace/backend/convex/_generated/api';
 import { useSessionMutation } from 'convex-helpers/react/sessions';
 import { nanoid } from 'nanoid';
 import { useCallback, useState } from 'react';
-import { api } from '@/convex/_generated/api';
 import type { CreateMachineReturn, MachineRegistration } from '../types';
 
 /**
