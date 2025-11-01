@@ -2,26 +2,33 @@
 
 ## Title
 
-Worker Chat Interface with Machine and Model Selection
+Worker Chat Interface with Machine and Worker Selection
 
 ## Description
 
-Provides a chat interface at `/app` where authenticated users can select a worker (identified as `<machine name>:<worker directory>`) and AI model to interact with. The UI displays an empty state when no machines are registered, prompting users to create their first machine. When machines and workers exist, users can select them and start chat sessions with model selection.
+Provides a chat interface at `/app` where authenticated users can select a machine and worker to interact with. The UI displays an empty state when no machines are registered, prompting users to create their first machine. When machines and workers exist, users can select them and start chat sessions with model selection.
+
+**Key Concepts:**
+
+- **Machines**: Physical/virtual computers registered by users
+- **Workers**: Individual authenticated processes running on machines that handle chat sessions
+- **Chat Sessions**: Conversations with AI models managed by workers
 
 **Related Design Documentation:**
 
 - [System Design - Flow 3: Worker Registration and Usage](../spec/design.md#flow-3-worker-registration-and-usage)
 - [Design Decisions - Worker Identity & Concurrency](../spec/design.md#worker-identity--concurrency)
+- [Design Decisions - Worker Token Authentication](../spec/design.md#authentication--security)
 - [Design Decisions - ID Allocation Strategy](../spec/design.md#id-allocation-strategy)
-- [Project Structure - Worker Chat UI Implementation](../codemaps/projectmap.md#implementation-status)
 
 ## Sequence Diagram
 
 ```plantuml
 @startuml
 actor User
-participant "ChatPage\n/app/page.tsx" as Page
+participant "ChatInterface\n/app/page.tsx" as Page
 participant "useMachines\nhook" as MachinesHook
+participant "useWorkers\nhook" as WorkersHook
 participant "useWorkerChat\nhook" as ChatHook
 participant "Convex\nBackend" as Backend
 
@@ -29,46 +36,49 @@ participant "Convex\nBackend" as Backend
 User -> Page: Navigate to /app
 Page -> MachinesHook: useMachines(): MachinesData
 MachinesHook -> Backend: machines.list(): Machine[]
-Backend -> MachinesHook: Return machines
+Backend -> MachinesHook: Return machines with worker counts
 MachinesHook -> Page: { machines, loading }
 
 alt No Machines
     Page -> User: Show empty state\n"Create your first machine"
     User -> Page: Click "Add Machine"
-    Page -> User: Show machine creation modal
+    Page -> User: Show machine creation dialog
     User -> Page: Submit machine name
-    Page -> Backend: machines.create(name: string): MachineRegistration
-    Backend -> Page: { machineId, token }
-    Page -> User: Display registration token
+    Page -> Backend: machines.create(machineId, name): MachineRegistration
+    Backend -> Page: { machineId, name }
+    Page -> User: Machine created successfully
 else Has Machines
-    Page -> User: Show chat interface\nwith worker selector
+    Page -> User: Show chat interface\nwith machine selector
 end
+
+== Machine Selection ==
+User -> Page: Select machine from dropdown
+Page -> WorkersHook: useWorkers(machineId): WorkersData
+WorkersHook -> Backend: workers.list(machineId): Worker[]
+Backend -> WorkersHook: Return workers for machine
+WorkersHook -> Page: { workers, loading }
+Page -> User: Display workers in selector
 
 == Worker Selection ==
 User -> Page: Select worker from dropdown
 Page -> ChatHook: Load worker info
-ChatHook -> Backend: workers.getByMachineAndPath(machineId, path): Worker
-Backend -> ChatHook: { workerId, availableModels }
-ChatHook -> Page: Update available models
+Page -> Page: Update selected worker state
+Page -> User: Show worker status badge
 
-== Model Selection ==
-User -> Page: Select model from dropdown
-Page -> Page: Update selected model state
-
-== Session Selection ==
+== Session Selection (TODO) ==
 User -> Page: Select worker from dropdown
 Page -> SessionsHook: useWorkerSessions(workerId): Session[]
 SessionsHook -> Backend: chat.listSessions(workerId): Session[]
 Backend -> SessionsHook: Return sessions
 SessionsHook -> Page: Display session list
 
-alt Restore Existing Session
+alt Restore Existing Session (TODO)
     User -> Page: Click on existing session
     Page -> ChatHook: restoreSession(sessionId): void
     ChatHook -> Backend: chat.restoreSession(sessionId): Session
     Backend -> ChatHook: Return session + messages
     ChatHook -> Page: Session restored, show chat
-else Start New Session
+else Start New Session (TODO)
     User -> Page: Click "New Session"
     Page -> Page: Show model selector
     User -> Page: Select model and click "Start Session"
@@ -79,13 +89,13 @@ else Start New Session
     ChatHook -> Page: Session ready, show chat
 end
 
-== Send Message ==
+== Send Message (TODO) ==
 User -> Page: Type message and send
 Page -> ChatHook: sendMessage(sessionId, message): void
 ChatHook -> Backend: chat.sendMessage(sessionId, message): void
 Backend --> Backend: Notify worker (subscription)
 
-== Receive Chunks ==
+== Receive Chunks (TODO) ==
 Backend --> ChatHook: Real-time chunk updates
 ChatHook -> Page: Stream chunks to UI
 Page -> User: Display streaming response
@@ -104,19 +114,25 @@ Page -> User: Display streaming response
 
 ### Core Chat Components
 
-- `apps/webapp/src/modules/worker/components/ChatInterface.tsx` - Main chat container with worker selection and session management ✅
-- `apps/webapp/src/modules/worker/components/WorkerSelector.tsx` - Dropdown to select worker (`<machine>:<directory>`) ✅
-- `apps/webapp/src/modules/worker/components/ModelSelector.tsx` - Dropdown to select AI model ✅
-- `apps/webapp/src/modules/worker/components/SessionList.tsx` - List of sessions for worker, allows restoration ✅
-- `apps/webapp/src/modules/worker/components/ChatMessageList.tsx` - Message history display with streaming support ✅
-- `apps/webapp/src/modules/worker/components/ChatInput.tsx` - Message input field with send button ✅
-- `apps/webapp/src/modules/worker/components/ChatMessage.tsx` - Individual message bubble (user/assistant) ✅
+- `apps/webapp/src/modules/assistant/components/ChatInterface.tsx` - Main chat container with worker selection and session management ✅
+- `apps/webapp/src/modules/assistant/components/MachineSelector.tsx` - Dropdown to select machine with worker counts ✅
+- `apps/webapp/src/modules/assistant/components/AssistantSelector.tsx` - Dropdown to select worker (reused component) ✅
+- `apps/webapp/src/modules/assistant/components/ModelSelector.tsx` - Dropdown to select AI model ✅
+- `apps/webapp/src/modules/assistant/components/SessionList.tsx` - List of sessions for worker, allows restoration ✅
+- `apps/webapp/src/modules/assistant/components/ChatMessageList.tsx` - Message history display with streaming support ✅
+- `apps/webapp/src/modules/assistant/components/ChatInput.tsx` - Message input field with send button ✅
+- `apps/webapp/src/modules/assistant/components/ChatMessage.tsx` - Individual message bubble (user/assistant) ✅
 
 ### Machine Management Components
 
-- `apps/webapp/src/modules/machine/components/MachineEmptyState.tsx` - Empty state when no machines exist ✅
-- `apps/webapp/src/modules/machine/components/CreateMachineDialog.tsx` - Modal for creating new machine ✅
-- `apps/webapp/src/modules/machine/components/MachineTokenDisplay.tsx` - Display registration token after creation ✅
+- `apps/webapp/src/modules/assistant/components/MachineEmptyState.tsx` - Empty state when no machines exist ✅
+- `apps/webapp/src/modules/assistant/components/CreateMachineDialog.tsx` - Modal for creating new machine ✅
+- `apps/webapp/src/modules/assistant/components/CreateWorkerDialog.tsx` - Modal for creating worker token ✅
+
+### Worker Management Components
+
+- `apps/webapp/src/modules/assistant/components/WorkersList.tsx` - Display workers grouped by status ✅
+- `apps/webapp/src/modules/assistant/components/PendingWorkersList.tsx` - Display pending authorization requests ✅
 
 ### Supporting Components
 
@@ -126,62 +142,113 @@ Page -> User: Display streaming response
 - Existing: `apps/webapp/src/components/ui/input.tsx` - ShadCN input
 - Existing: `apps/webapp/src/components/ui/scroll-area.tsx` - ShadCN scroll area for messages
 - Existing: `apps/webapp/src/components/ui/skeleton.tsx` - Loading states
+- Existing: `apps/webapp/src/components/ui/badge.tsx` - Status badges
+- Existing: `apps/webapp/src/components/ui/card.tsx` - Card containers
 
 ## Frontend Service Layer
 
 ### Machine Management Hooks
 
-- `apps/webapp/src/modules/machine/hooks/useMachines.ts` - Fetch and manage machines ✅
+- `apps/webapp/src/modules/assistant/hooks/useMachines.ts` - Fetch and manage machines ✅
 
   - **Functions**:
     ```typescript
     useMachines(): MachinesData
     ```
 
-- `apps/webapp/src/modules/machine/hooks/useCreateMachine.ts` - Create new machine ✅
+- `apps/webapp/src/modules/assistant/hooks/useCreateMachine.ts` - Create new machine ✅
+
   - **Functions**:
     ```typescript
     useCreateMachine(): CreateMachineReturn
     ```
 
+- `apps/webapp/src/modules/assistant/hooks/useDeleteMachine.ts` - Delete machine ✅
+  - **Functions**:
+    ```typescript
+    useDeleteMachine(): DeleteMachineReturn
+    ```
+
 ### Worker Management Hooks
 
-- `apps/webapp/src/modules/worker/hooks/useWorkers.ts` - Fetch workers for machines ✅
+- `apps/webapp/src/modules/assistant/hooks/useWorkers.ts` - Fetch workers for a machine ✅
 
   - **Functions**:
     ```typescript
-    useWorkers(machineId?: string): WorkersData
+    useWorkers(machineId: string): WorkersData
     ```
 
-- `apps/webapp/src/modules/worker/hooks/useWorkerSessions.ts` - Fetch sessions for a worker ✅
+- `apps/webapp/src/modules/assistant/hooks/usePendingWorkers.ts` - Fetch pending workers ✅
 
   - **Functions**:
     ```typescript
-    useWorkerSessions(workerId: string | null): { sessions: ChatSession[], loading: boolean }
+    usePendingWorkers(machineId: string): PendingWorkersData
     ```
 
-- `apps/webapp/src/modules/worker/hooks/useWorkerChat.ts` - Manage chat session(s) ✅
+- `apps/webapp/src/modules/assistant/hooks/useCreateWorker.ts` - Generate worker token ✅
+
   - **Functions**:
     ```typescript
-    useWorkerChat(workerId: string | null): WorkerChatReturn
+    useCreateWorker(): CreateWorkerReturn
+    ```
+
+- `apps/webapp/src/modules/assistant/hooks/useApproveWorker.ts` - Approve pending worker ✅
+
+  - **Functions**:
+    ```typescript
+    useApproveWorker(): ApproveWorkerReturn
+    ```
+
+- `apps/webapp/src/modules/assistant/hooks/useRejectWorker.ts` - Reject pending worker ✅
+
+  - **Functions**:
+    ```typescript
+    useRejectWorker(): RejectWorkerReturn
+    ```
+
+- `apps/webapp/src/modules/assistant/hooks/useRemoveWorker.ts` - Remove worker ✅
+  - **Functions**:
+    ```typescript
+    useRemoveWorker(): RemoveWorkerReturn
+    ```
+
+### Chat Management Hooks (TODO)
+
+- `apps/webapp/src/modules/assistant/hooks/useAssistantSessions.ts` - Fetch sessions for a worker ⚠️ (Mock data)
+
+  - **Functions**:
+    ```typescript
+    useAssistantSessions(workerId: string | null): { sessions: ChatSession[], loading: boolean }
+    ```
+
+- `apps/webapp/src/modules/assistant/hooks/useAssistantChat.ts` - Manage chat session(s) ⚠️ (Mock data)
+  - **Functions**:
+    ```typescript
+    useAssistantChat(workerId: string | null): AssistantChatReturn
     ```
 
 ### Frontend Type Definitions
 
-- `apps/webapp/src/modules/machine/types.ts` - Machine-related types ✅
+- `apps/webapp/src/modules/assistant/types.ts` - All assistant module types ✅
 
   ```typescript
+  // Machine types
   export interface Machine {
     machineId: string;
     name: string;
     status: "online" | "offline";
     lastSeen: number;
-    workerCount: number;
+    assistantCount: number; // Total worker count
+    workerCounts: {
+      online: number;
+      offline: number;
+      pending: number;
+    };
   }
 
   export interface MachineRegistration {
     machineId: string;
-    token: string; // Format: <machine_id>:<machine_secret>
+    name: string;
   }
 
   export interface MachinesData {
@@ -195,20 +262,29 @@ Page -> User: Display streaming response
     isCreating: boolean;
     error: Error | null;
   }
-  ```
 
-- `apps/webapp/src/modules/worker/types.ts` - Worker-related types ✅
-
-  ```typescript
+  // Worker types
   export interface Worker {
     workerId: string;
     machineId: string;
-    machineName: string;
-    workingDirectory: string;
-    displayName: string; // Format: <machine_name>:<working_directory>
-    status: "online" | "offline";
-    activeSessionCount: number;
-    availableModels: string[];
+    name?: string;
+    status: "pending_authorization" | "ready" | "online" | "offline";
+    createdAt: number;
+    approvedAt?: number;
+    lastHeartbeat?: number;
+  }
+
+  export interface PendingWorker {
+    workerId: string;
+    machineId: string;
+    name?: string;
+    status: "pending_authorization";
+    createdAt: number;
+  }
+
+  export interface WorkerRegistration {
+    workerId: string;
+    token: string; // Format: machine_<machine_id>:worker_<worker_id>
   }
 
   export interface WorkersData {
@@ -217,6 +293,40 @@ Page -> User: Display streaming response
     error: Error | null;
   }
 
+  export interface PendingWorkersData {
+    workers: PendingWorker[] | undefined;
+    loading: boolean;
+    error: Error | null;
+  }
+
+  export interface CreateWorkerReturn {
+    createWorker: (
+      machineId: string,
+      name?: string
+    ) => Promise<WorkerRegistration>;
+    isCreating: boolean;
+    error: Error | null;
+  }
+
+  export interface ApproveWorkerReturn {
+    approveWorker: (workerId: string) => Promise<void>;
+    isApproving: boolean;
+    error: Error | null;
+  }
+
+  export interface RejectWorkerReturn {
+    rejectWorker: (workerId: string) => Promise<void>;
+    isRejecting: boolean;
+    error: Error | null;
+  }
+
+  export interface RemoveWorkerReturn {
+    removeWorker: (workerId: string) => Promise<void>;
+    isRemoving: boolean;
+    error: Error | null;
+  }
+
+  // Chat types (TODO - not yet implemented in backend)
   export interface ChatMessage {
     id: string;
     role: "user" | "assistant" | "system";
@@ -232,51 +342,54 @@ Page -> User: Display streaming response
     status: "active" | "idle" | "terminated";
     createdAt: number;
   }
+
+  export interface AssistantChatReturn {
+    // Session management
+    session: ChatSession | null;
+    startSession: (model: string) => Promise<string>;
+    restoreSession: (sessionId: string) => Promise<void>;
+    endSession: () => Promise<void>;
+
+    // Messaging
+    messages: ChatMessage[];
+    sendMessage: (content: string) => Promise<void>;
+
+    // State
+    isLoading: boolean;
+    error: Error | null;
+  }
   ```
-
-export interface WorkerChatReturn {
-// Session management
-session: ChatSession | null;
-startSession: (model: string) => Promise<string>;
-restoreSession: (sessionId: string) => Promise<void>;
-endSession: () => Promise<void>;
-
-// Messaging
-messages: ChatMessage[];
-sendMessage: (content: string) => Promise<void>;
-
-// State
-isLoading: boolean;
-error: Error | null;
-}
-
-````
 
 ## Backend Function Entry Point
 
 ### Machine Management
 
-- **[TODO]** `services/backend/convex/machines.ts` - Machine registration and management
+- `services/backend/convex/machines.ts` - Machine registration and management ✅
 - **Functions**:
   ```typescript
   list(args: SessionIdArg): Promise<Machine[]>
-  create(args: SessionIdArg & { name: string }): Promise<MachineRegistration>
-  updateStatus(args: { machineId: string; status: MachineStatus }): Promise<void>
-  getById(args: SessionIdArg & { machineId: string }): Promise<Machine | null>
+  create(args: SessionIdArg & { machineId: string; name: string }): Promise<MachineRegistration>
+  updateMachineStatus(args: { machineId: string }): Promise<void> // Internal mutation
+  deleteMachine(args: SessionIdArg & { machineId: string }): Promise<void>
   ```
 
 ### Worker Management
 
-- **[TODO]** `services/backend/convex/workers.ts` - Worker registration and queries
+- `services/backend/convex/workers.ts` - Worker registration and management ✅
 - **Functions**:
   ```typescript
-  list(args: SessionIdArg & { machineId?: string }): Promise<Worker[]>
-  getByMachineAndPath(args: SessionIdArg & { machineId: string; path: string }): Promise<Worker | null>
-  register(args: { machineId: string; workerId: string; workingDirectory: string }): Promise<void>
-  updateModels(args: { workerId: string; models: string[] }): Promise<void>
+  create(args: SessionIdArg & { machineId: string; workerId: string; name?: string }): Promise<WorkerRegistration>
+  register(args: { machineId: string; workerId: string }): Promise<RegistrationStatus>
+  approve(args: SessionIdArg & { workerId: string }): Promise<{ success: boolean }>
+  reject(args: SessionIdArg & { workerId: string }): Promise<{ success: boolean }>
+  list(args: SessionIdArg & { machineId: string }): Promise<Worker[]>
+  listPending(args: SessionIdArg & { machineId: string }): Promise<PendingWorker[]>
+  heartbeat(args: { machineId: string; workerId: string }): Promise<void>
+  setOffline(args: { machineId: string; workerId: string }): Promise<void>
+  remove(args: SessionIdArg & { workerId: string }): Promise<{ success: boolean }>
   ```
 
-### Chat Management
+### Chat Management (TODO)
 
 - **[TODO]** `services/backend/convex/chat.ts` - Chat session and message handling
 - **Functions**:
@@ -290,206 +403,153 @@ error: Error | null;
   subscribeToChunks(args: SessionIdArg & { chatSessionId: string }): Promise<ChatChunk[]>
   ```
 
-### Contracts
+## Contracts
 
 ```typescript
-// From services/backend/convex/machines.ts [TODO]
+// From services/backend/convex/machines.ts ✅
 
 export interface Machine {
-machineId: string; // Primary key (nanoid)
-userId: string; // Owner
-name: string;
-status: "online" | "offline";
-lastSeen: number;
-createdAt: number;
+  machineId: string; // Primary key (nanoid)
+  userId: string; // Owner
+  name: string;
+  status: "online" | "offline";
+  lastHeartbeat: number;
 }
 
 export interface MachineRegistration {
-machineId: string;
-token: string; // Format: <machine_id>:<machine_secret>
+  machineId: string;
+  name: string;
 }
 
-export interface MachineStatus {
-online: boolean;
-lastSeen: number;
-workerCount: number;
-}
-
-// From services/backend/convex/workers.ts [TODO]
+// From services/backend/convex/workers.ts ✅
 
 export interface Worker {
-workerId: string; // Primary key (nanoid)
-machineId: string;
-workingDirectory: string;
-availableModels: string[];
-status: "online" | "offline";
-activeSessionCount: number;
-lastActivity: number;
-createdAt: number;
+  workerId: string; // Primary key (nanoid)
+  machineId: string;
+  name?: string;
+  status: "pending_authorization" | "ready" | "online" | "offline";
+  createdAt: number;
+  approvedAt?: number;
+  approvedBy?: string; // User ID who approved
+  lastHeartbeat?: number;
+}
+
+export interface WorkerRegistration {
+  workerId: string;
+  token: string; // Format: machine_<machine_id>:worker_<worker_id>
+}
+
+export interface RegistrationStatus {
+  status: "pending_authorization" | "ready";
+  approved: boolean;
+  workerId: string;
+  name?: string;
 }
 
 // From services/backend/convex/chat.ts [TODO]
 
 export interface ChatSession {
-chatSessionId: string; // Primary key (from opencode)
-workerId: string;
-userId: string;
-model: string;
-status: "active" | "idle" | "terminated";
-lastActivity: number;
-createdAt: number;
+  chatSessionId: string; // Primary key (from opencode)
+  workerId: string;
+  userId: string;
+  model: string;
+  status: "active" | "idle" | "terminated";
+  lastActivity: number;
+  createdAt: number;
 }
 
 export interface ChatMessage {
-messageId: string; // Primary key (nanoid)
-chatSessionId: string;
-role: "user" | "assistant" | "system";
-content: string;
-timestamp: number;
-completed: boolean;
+  messageId: string; // Primary key (nanoid)
+  chatSessionId: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: number;
+  completed: boolean;
 }
 
 export interface ChatChunk {
-chunkId: string; // Primary key (nanoid)
-messageId: string;
-chatSessionId: string;
-chunk: string;
-sequence: number;
-timestamp: number;
+  chunkId: string; // Primary key (nanoid)
+  messageId: string;
+  chatSessionId: string;
+  chunk: string;
+  sequence: number;
+  timestamp: number;
 }
-
-// API Functions [TODO]
-
-export const list = query({
-args: {
-  ...SessionIdArg,
-},
-handler: async (ctx, args): Promise<Machine[]> => {
-  // Get user's machines
-},
-});
-
-export const create = mutation({
-args: {
-  ...SessionIdArg,
-  name: v.string(),
-},
-handler: async (ctx, args): Promise<MachineRegistration> => {
-  // Generate machine_id and secret using nanoid
-  // Store machine record
-  // Return registration token
-},
-});
-
-export const startSession = mutation({
-args: {
-  ...SessionIdArg,
-  workerId: v.string(),
-  model: v.string(),
-},
-handler: async (ctx, args): Promise<string> => {
-  // Create chat session
-  // Return chatSessionId
-},
-});
-
-export const sendMessage = mutation({
-args: {
-  ...SessionIdArg,
-  chatSessionId: v.string(),
-  content: v.string(),
-},
-handler: async (ctx, args): Promise<void> => {
-  // Create message record
-  // Worker will receive via subscription
-},
-});
-
-export const subscribeToChunks = query({
-args: {
-  ...SessionIdArg,
-  chatSessionId: v.string(),
-},
-handler: async (ctx, args): Promise<ChatChunk[]> => {
-  // Real-time subscription to chunks
-},
-});
-````
+```
 
 ## Backend Schema
 
-- **[TODO]** `services/backend/convex/schema.ts` - Add new tables
-  - `machines` table definition
-  - `workers` table definition
-  - `chatSessions` table definition
-  - `chatMessages` table definition
-  - `chatChunks` table definition
+- `services/backend/convex/schema.ts` - Database schema ✅
 
 ```typescript
-// Schema Additions [TODO]
+// Schema Definitions ✅
 
 // machines table
 machines: defineTable({
   machineId: v.string(), // nanoid (primary key for business logic)
-  machineSecret: v.string(), // Hashed secret for authentication
-  userId: v.string(), // Owner
+  userId: v.id('users'), // Owner
   name: v.string(),
-  status: v.union(v.literal("online"), v.literal("offline")),
-  lastSeen: v.number(),
-  createdAt: v.number(),
+  status: v.union(v.literal('online'), v.literal('offline')),
+  lastHeartbeat: v.number(),
 })
-  .index("by_machineId", ["machineId"])
-  .index("by_userId", ["userId"])
-  .index("by_status", ["status"]),
+  .index('by_machine_id', ['machineId'])
+  .index('by_user_id', ['userId']),
 
 // workers table
 workers: defineTable({
   workerId: v.string(), // nanoid (primary key)
   machineId: v.string(),
-  workingDirectory: v.string(),
-  availableModels: v.array(v.string()),
-  status: v.union(v.literal("online"), v.literal("offline")),
-  activeSessionCount: v.number(),
-  lastActivity: v.number(),
+  name: v.optional(v.string()),
+  status: v.union(
+    v.literal('pending_authorization'),
+    v.literal('ready'),
+    v.literal('online'),
+    v.literal('offline')
+  ),
   createdAt: v.number(),
+  approvedAt: v.optional(v.number()),
+  approvedBy: v.optional(v.id('users')),
+  lastHeartbeat: v.optional(v.number()),
 })
-  .index("by_workerId", ["workerId"])
-  .index("by_machineId", ["machineId"])
-  .index("by_machine_and_directory", ["machineId", "workingDirectory"]),
+  .index('by_worker_id', ['workerId'])
+  .index('by_machine_id', ['machineId'])
+  .index('by_machine_and_worker', ['machineId', 'workerId'])
+  .index('by_status', ['status'])
+  .index('by_machine_and_status', ['machineId', 'status']),
 
-// chatSessions table
+// chatSessions table [TODO]
 chatSessions: defineTable({
   chatSessionId: v.string(), // From opencode (primary key)
   workerId: v.string(),
   userId: v.string(),
   model: v.string(),
   status: v.union(
-    v.literal("active"),
-    v.literal("idle"),
-    v.literal("terminated")
+    v.literal('active'),
+    v.literal('idle'),
+    v.literal('terminated')
   ),
   lastActivity: v.number(),
   createdAt: v.number(),
 })
-  .index("by_chatSessionId", ["chatSessionId"])
-  .index("by_workerId", ["workerId"])
-  .index("by_userId", ["userId"])
-  .index("by_status", ["status"]),
+  .index('by_chatSessionId', ['chatSessionId'])
+  .index('by_workerId', ['workerId'])
+  .index('by_userId', ['userId'])
+  .index('by_status', ['status']),
 
-// chatMessages table
+// chatMessages table [TODO]
 chatMessages: defineTable({
   messageId: v.string(), // nanoid (primary key)
   chatSessionId: v.string(),
-  role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+  role: v.union(v.literal('user'), v.literal('assistant'), v.literal('system')),
   content: v.string(),
   timestamp: v.number(),
   completed: v.boolean(),
 })
-  .index("by_messageId", ["messageId"])
-  .index("by_chatSessionId", ["chatSessionId"])
-  .index("by_timestamp", ["timestamp"]),
+  .index('by_messageId', ['messageId'])
+  .index('by_chatSessionId', ['chatSessionId'])
+  .index('by_timestamp', ['timestamp']),
 
-// chatChunks table (for streaming)
+// chatChunks table (for streaming) [TODO]
 chatChunks: defineTable({
   chunkId: v.string(), // nanoid (primary key)
   messageId: v.string(),
@@ -498,102 +558,14 @@ chatChunks: defineTable({
   sequence: v.number(),
   timestamp: v.number(),
 })
-  .index("by_chunkId", ["chunkId"])
-  .index("by_messageId", ["messageId"])
-  .index("by_chatSessionId_and_sequence", ["chatSessionId", "sequence"]),
+  .index('by_chunkId', ['chunkId'])
+  .index('by_messageId', ['messageId'])
+  .index('by_chatSessionId_and_sequence', ['chatSessionId', 'sequence']),
 ```
-
-## Backend Modules
-
-### Machine Domain Logic
-
-- **[TODO]** `services/backend/modules/machine/types.ts` - Machine types and interfaces
-
-  ```typescript
-  export interface IMachineAuth {
-    machineId: string;
-    machineSecret: string;
-  }
-
-  export interface IMachineToken {
-    token: string; // Format: <machine_id>:<machine_secret>
-  }
-  ```
-
-- **[TODO]** `services/backend/modules/machine/machineAuth.ts` - Machine authentication logic
-
-  ```typescript
-  parseToken(token: string): IMachineAuth
-  validateToken(ctx: Context, token: string): Promise<boolean>
-  hashSecret(secret: string): string
-  ```
-
-- **[TODO]** `services/backend/modules/machine/machineRegistry.ts` - Machine registration business logic
-  ```typescript
-  generateMachineToken(): IMachineToken
-  registerMachine(userId: string, name: string): Promise<MachineRegistration>
-  ```
-
-### Worker Domain Logic
-
-- **[TODO]** `services/backend/modules/worker/types.ts` - Worker types and interfaces
-
-  ```typescript
-  export interface IWorkerRegistration {
-    workerId: string;
-    machineId: string;
-    workingDirectory: string;
-  }
-  ```
-
-- **[TODO]** `services/backend/modules/worker/workerRegistry.ts` - Worker registration logic
-  ```typescript
-  registerWorker(registration: IWorkerRegistration): Promise<void>
-  updateAvailableModels(workerId: string, models: string[]): Promise<void>
-  ```
-
-### Chat Domain Logic
-
-- **[TODO]** `services/backend/modules/chat/types.ts` - Chat types and interfaces
-
-  ```typescript
-  export interface ISessionConfig {
-    workerId: string;
-    userId: string;
-    model: string;
-  }
-  ```
-
-- **[TODO]** `services/backend/modules/chat/sessionManager.ts` - Session lifecycle management
-  ```typescript
-  createSession(config: ISessionConfig): Promise<string>
-  terminateIdleSessions(): Promise<void>
-  ```
-
-## Utility Functions
-
-### Frontend Utilities
-
-- **[TODO]** `apps/webapp/src/modules/worker/utils/workerFormatter.ts` - Format worker display names
-  ```typescript
-  formatWorkerDisplayName(machineName: string, workingDirectory: string): string
-  // Returns: "<machine_name>:<working_directory>"
-  ```
-
-### Backend Utilities
-
-- **[TODO]** `services/backend/modules/shared/idGenerator.ts` - ID generation wrapper
-  ```typescript
-  generateMachineId(): string
-  generateWorkerId(): string
-  generateMessageId(): string
-  generateChunkId(): string
-  // All use nanoid
-  ```
 
 ## Implementation Notes
 
-### Empty State Flow
+### Empty State Flow ✅
 
 1. User navigates to `/app`
 2. `useMachines()` loads machines
@@ -601,20 +573,34 @@ chatChunks: defineTable({
 4. User clicks "Add Machine"
 5. `CreateMachineDialog` opens
 6. User enters machine name
-7. `createMachine(name)` generates token
-8. `MachineTokenDisplay` shows token for user to copy
-9. User saves token for machine setup
+7. `createMachine(name)` creates machine record
+8. Machine appears in list
+9. User can now add workers via action menu
 
-### Worker Selection Flow
+### Worker Selection Flow ✅
 
-1. Load all machines and workers on mount
-2. Group workers by machine
-3. Format display as `<machine_name>:<directory>`
-4. When worker selected, show session list (not chat)
+1. Load all machines on mount
+2. User selects machine from dropdown
+3. `useWorkers(machineId)` loads workers for that machine
+4. Workers displayed in selector with status badges
+5. User selects worker
+6. Worker status and info displayed
 
-### Session Selection Flow
+### Worker Authorization Flow ✅
 
-1. When worker selected, `useWorkerSessions(workerId)` loads sessions
+1. User clicks "Add Worker" from machine action menu
+2. `CreateWorkerDialog` opens
+3. System generates worker token: `machine_<id>:worker_<id>`
+4. User copies token and starts worker process
+5. Worker registers with backend (status: pending_authorization)
+6. User sees pending worker in machine settings
+7. User clicks "Approve"
+8. Worker transitions to ready/online status
+9. Worker appears in chat interface selector
+
+### Session Selection Flow (TODO)
+
+1. When worker selected, `useAssistantSessions(workerId)` loads sessions
 2. Display session list with:
    - Active/idle sessions at top (with green indicator)
    - Terminated sessions below
@@ -623,7 +609,7 @@ chatChunks: defineTable({
    - Click existing session → `restoreSession(sessionId)` → load messages → show chat
    - Click "New Session" → select model → `startSession(model)` → show chat
 
-### Chat Session Flow
+### Chat Session Flow (TODO)
 
 1. Session must be active (restored or newly started) before messaging
 2. Backend creates/restores session record with status "active"
@@ -633,7 +619,7 @@ chatChunks: defineTable({
 6. Chunks stream in real-time and append to message display
 7. When message complete, `writeMessage` called with full content
 
-### Model Synchronization Flow
+### Model Synchronization Flow (TODO)
 
 1. Worker machine queries opencode on startup
 2. Worker calls `workers.updateModels(workerId, models[])`
@@ -641,31 +627,35 @@ chatChunks: defineTable({
 4. Frontend fetches models when worker selected
 5. Models displayed in dropdown for user selection
 
-## Implementation Order
+## Implementation Status
 
-### Phase 1: Frontend UI (Completed ✅)
+### Phase 1: Machine & Worker Management (Completed ✅)
 
-1. ✅ **Frontend Types** - Type definitions for machines, workers, sessions
-2. ✅ **Frontend Hooks** - Mock hooks for data fetching
-3. ✅ **Machine Components** - Empty state, creation dialog, token display
-4. ✅ **Worker Components** - Selectors, session list, chat interface
-5. ✅ **Chat Components** - Message display, input, streaming simulation
+1. ✅ **Backend Schema** - machines and workers tables
+2. ✅ **Backend Machines** - CRUD operations
+3. ✅ **Backend Workers** - Registration, approval, management
+4. ✅ **Frontend Types** - All machine and worker types
+5. ✅ **Frontend Hooks** - All machine and worker hooks
+6. ✅ **Machine Components** - Empty state, creation, selector
+7. ✅ **Worker Components** - Creation, approval, listing
+8. ✅ **ChatInterface** - Machine and worker selection
+9. ✅ **Worker Token Auth** - Complete authorization flow
 
-### Phase 2: Backend Integration (Next)
+### Phase 2: Chat Integration (Next)
 
-1. **Backend Schema** - Define all tables first
-2. **Backend Utilities** - ID generation helpers
-3. **Backend Machines** - Machine CRUD operations
-4. **Backend Workers** - Worker registration and queries
-5. **Backend Chat** - Session and message handling
-6. **Replace Mock Hooks** - Connect frontend to real Convex queries/mutations
-7. **Integration** - Connect all pieces and test flow
+1. **Backend Schema** - Chat tables (sessions, messages, chunks)
+2. **Backend Chat** - Session and message handling
+3. **Replace Mock Chat Hooks** - Connect to real Convex queries/mutations
+4. **Worker Service** - Chat session management
+5. **Integration** - End-to-end chat flow testing
 
 ## Notes
 
-- This codemap covers **UI implementation only**
-- Worker service (actual machine process) is **out of scope** for this phase
-- Model data will be stubbed initially until worker service implements model discovery
-- Authentication already exists via `SessionIdArg` pattern
-- Dark mode support required for all components (follow existing patterns)
-- Real-time updates via Convex subscriptions (already established pattern in codebase)
+- Machine and worker management is fully implemented and functional
+- Chat functionality uses mock data and needs backend implementation
+- Worker service (actual machine process) handles chat sessions
+- Model data will come from worker service via backend
+- Authentication uses `SessionIdArg` pattern throughout
+- Dark mode support implemented for all components
+- Real-time updates via Convex subscriptions
+- Worker token format: `machine_<machine_id>:worker_<worker_id>`
