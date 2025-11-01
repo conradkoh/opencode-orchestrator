@@ -306,17 +306,22 @@ Array<{
 ## Implementation Status
 
 - [x] Frontend types defined
-- [x] Frontend components created (with mock data)
-- [ ] Convex schema defined
-- [ ] Backend mutations implemented
-- [ ] Frontend hooks connected to real backend
-- [ ] End-to-end testing completed
+- [x] Frontend components created
+- [x] Convex schema defined
+- [x] Backend mutations implemented (create, list, delete)
+- [x] Frontend hooks connected to real backend
+- [x] Machine selector with settings page
+- [x] Machine deletion with confirmation
+- [ ] End-to-end testing with physical worker
+- [ ] Worker count integration (placeholder: 0)
 
 ## Notes
 
 - Machine ID and secret are generated client-side using nanoid for security
 - Token format is `${machineId}:${secret}` for easy parsing
 - Machine status defaults to 'offline' until physical machine connects
-- User association will be added in future iteration
+- User association implemented via session authentication
 - Assistant count is placeholder (0) until workers table is implemented
+- Machine settings page provides dedicated UI for machine management
+- Delete functionality requires confirmation and redirects to /app after deletion
 
