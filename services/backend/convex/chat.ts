@@ -476,8 +476,39 @@ export const subscribeToMessages = query({
     sessionId: v.string(),
   },
   handler: async (ctx, args) => {
-    // Same as getMessages but will update in real-time via Convex subscriptions
-    return await getMessages.handler(ctx, args);
+    // Verify user is authenticated
+    const user = await getAuthUserOptional(ctx, args);
+    if (!user) {
+      return [];
+    }
+
+    // Verify session exists and user owns it
+    const session = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .first();
+
+    if (!session || session.userId !== user._id) {
+      return [];
+    }
+
+    // Get all messages for this session
+    const messages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .collect();
+
+    // Sort by timestamp
+    messages.sort((a, b) => a.timestamp - b.timestamp);
+
+    return messages.map((message) => ({
+      id: message.messageId,
+      sessionId: message.sessionId,
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp,
+      completed: message.completed,
+    }));
   },
 });
 
