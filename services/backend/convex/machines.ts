@@ -55,6 +55,120 @@ export const create = mutation({
 });
 
 /**
+ * Authenticate a machine and update its status to online.
+ * Called by the worker process on startup.
+ *
+ * @param machineId - Machine identifier
+ * @param secret - Machine secret for authentication
+ * @returns Machine details if authentication successful
+ */
+export const authenticate = mutation({
+  args: {
+    machineId: v.string(),
+    secret: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find machine by ID
+    const machine = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
+      .first();
+
+    if (!machine) {
+      throw new Error('Machine not found. Please check your machine token.');
+    }
+
+    // Verify secret
+    if (machine.secret !== args.secret) {
+      throw new Error('Invalid machine secret. Please check your machine token.');
+    }
+
+    // Update status to online
+    await ctx.db.patch(machine._id, {
+      status: 'online',
+      lastHeartbeat: Date.now(),
+    });
+
+    return {
+      success: true,
+      machineId: machine.machineId,
+      name: machine.name,
+    };
+  },
+});
+
+/**
+ * Update machine heartbeat to maintain online status.
+ * Called periodically by the worker process.
+ *
+ * @param machineId - Machine identifier
+ * @param secret - Machine secret for authentication
+ */
+export const heartbeat = mutation({
+  args: {
+    machineId: v.string(),
+    secret: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find machine by ID
+    const machine = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
+      .first();
+
+    if (!machine) {
+      throw new Error('Machine not found');
+    }
+
+    // Verify secret
+    if (machine.secret !== args.secret) {
+      throw new Error('Invalid machine secret');
+    }
+
+    // Update heartbeat timestamp
+    await ctx.db.patch(machine._id, {
+      lastHeartbeat: Date.now(),
+    });
+  },
+});
+
+/**
+ * Update machine status to offline.
+ * Called by the worker process on graceful shutdown.
+ *
+ * @param machineId - Machine identifier
+ * @param secret - Machine secret for authentication
+ */
+export const setOffline = mutation({
+  args: {
+    machineId: v.string(),
+    secret: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find machine by ID
+    const machine = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', args.machineId))
+      .first();
+
+    if (!machine) {
+      throw new Error('Machine not found');
+    }
+
+    // Verify secret
+    if (machine.secret !== args.secret) {
+      throw new Error('Invalid machine secret');
+    }
+
+    // Update status to offline
+    await ctx.db.patch(machine._id, {
+      status: 'offline',
+      lastHeartbeat: Date.now(),
+    });
+  },
+});
+
+/**
  * Delete a machine by ID.
  * Only the owner can delete their machine.
  *

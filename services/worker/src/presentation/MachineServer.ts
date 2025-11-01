@@ -1,5 +1,6 @@
 import type { MachineId, WorkerId } from '@domain/valueObjects/Ids';
 import type { MachineToken } from '@domain/valueObjects/MachineToken';
+import { ConvexClientAdapter } from '@infrastructure/convex/ConvexClientAdapter';
 import type { WorkerConfig } from '../config';
 
 /**
@@ -35,6 +36,7 @@ export class MachineServer {
   private _machineToken: MachineToken | null = null;
   private _rootDirectory: string | null = null;
   private _isRunning = false;
+  private _convexClient: ConvexClientAdapter | null = null;
 
   /**
    * Starts the machine server and connects to Convex.
@@ -58,20 +60,38 @@ export class MachineServer {
       throw new Error('Machine ID and secret are required');
     }
 
+    // Get Convex URL from environment
+    const convexUrl = process.env.CONVEX_URL;
+    if (!convexUrl) {
+      throw new Error(
+        'CONVEX_URL environment variable is required. Please set it in your .env file.'
+      );
+    }
+
     console.log('🔐 Authenticating with Convex...');
 
     // Store machine token
     this._machineToken = `${config.machineId}:${config.machineSecret}` as unknown as MachineToken;
 
-    // TODO: Implement full startup flow
-    // 1. Authenticate with Convex (api.machines.authenticate)
+    // Create Convex client and authenticate
+    this._convexClient = new ConvexClientAdapter(convexUrl, config);
+
+    try {
+      const machineInfo = await this._convexClient.authenticate();
+      console.log(`✅ Authenticated as machine: ${machineInfo.name} (${machineInfo.machineId})`);
+    } catch (error) {
+      throw new Error(
+        `Failed to authenticate with Convex: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    // TODO: Implement remaining startup flow
     // 2. Sync state
     // 3. Initialize workers
     // 4. Subscribe to events
     // 5. Start monitors
 
     this._isRunning = true;
-    console.log(`✅ Authenticated as machine: ${config.machineId}`);
   }
 
   /**
@@ -88,16 +108,20 @@ export class MachineServer {
       return;
     }
 
-    console.log('Stopping machine server...');
+    console.log('🛑 Stopping machine server...');
 
     // TODO: Implement graceful shutdown
     // 1. Unsubscribe from events
     // 2. Terminate sessions
-    // 3. Update status
-    // 4. Close connections
+
+    // Disconnect from Convex (sets status to offline)
+    if (this._convexClient) {
+      await this._convexClient.disconnect();
+      this._convexClient = null;
+    }
 
     this._isRunning = false;
-    console.log('Machine server stopped');
+    console.log('✅ Machine server stopped');
   }
 
   /**

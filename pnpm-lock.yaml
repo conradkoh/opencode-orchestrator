@@ -236,6 +236,9 @@ importers:
       '@opencode-ai/sdk':
         specifier: ^0.15.30
         version: 0.15.30
+      '@workspace/backend':
+        specifier: workspace:*
+        version: link:../backend
       convex:
         specifier: ^1.16.0
         version: 1.27.3(react@19.1.0)

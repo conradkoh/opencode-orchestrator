@@ -29,6 +29,7 @@
   "license": "MIT",
   "dependencies": {
     "@opencode-ai/sdk": "^0.15.30",
+    "@workspace/backend": "workspace:*",
     "convex": "^1.16.0",
     "nanoid": "^5.0.8",
     "dotenv": "^16.4.5"

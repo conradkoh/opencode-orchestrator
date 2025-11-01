@@ -96,6 +96,7 @@ export async function promptForToken(): Promise<string> {
 /**
  * Save machine token to .env file.
  * Creates or overwrites the .env file with the token.
+ * Also adds CONVEX_URL if not already present.
  *
  * @param token - Machine token to save
  * @throws Error if file write fails
@@ -110,10 +111,27 @@ export async function saveToken(token: string): Promise<void> {
   parseToken(token); // Will throw if invalid
 
   const envPath = path.join(process.cwd(), '.env');
-  const envContent = `# Machine authentication token\n# Format: <machine_id>:<machine_secret>\nMACHINE_TOKEN=${token}\n`;
+
+  // Check if CONVEX_URL is already set
+  const existingConvexUrl = process.env.CONVEX_URL;
+
+  const envContent = `# Machine authentication token
+# Format: <machine_id>:<machine_secret>
+MACHINE_TOKEN=${token}
+
+# Convex backend URL
+# Get this from your Convex dashboard or use the default production URL
+CONVEX_URL=${existingConvexUrl || 'https://your-deployment.convex.cloud'}
+`;
 
   await fs.writeFile(envPath, envContent, 'utf-8');
-  console.log('✅ Machine token saved to .env\n');
+  console.log('✅ Machine token saved to .env');
+
+  if (!existingConvexUrl) {
+    console.log('⚠️  Please update CONVEX_URL in .env with your Convex deployment URL\n');
+  } else {
+    console.log('');
+  }
 }
 
 /**
