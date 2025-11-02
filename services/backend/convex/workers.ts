@@ -478,13 +478,50 @@ export const requestConnect = mutation({
       throw new Error('Worker is not online');
     }
 
-    // Update worker with connect request timestamp
-    // Worker will see this and initialize opencode
+    // Set connect request timestamp
+    // Worker subscription will detect this and initialize opencode
+    const now = Date.now();
     await ctx.db.patch(worker._id, {
-      lastHeartbeat: Date.now(), // Trigger subscription update
+      connectRequestedAt: now,
     });
 
-    console.log('[workers.requestConnect] Connect request sent');
-    return { success: true, workerId: args.workerId };
+    console.log('[workers.requestConnect] Connect request sent at:', now);
+    return { success: true, workerId: args.workerId, requestedAt: now };
+  },
+});
+
+/**
+ * Mark worker as connected after opencode initialization completes.
+ * Called by worker after successfully connecting opencode client.
+ *
+ * @param workerId - Worker ID
+ * @param machineId - Machine ID
+ * @returns Success status
+ */
+export const markConnected = mutation({
+  args: {
+    workerId: v.string(),
+    machineId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find worker
+    const worker = await ctx.db
+      .query('workers')
+      .withIndex('by_machine_and_worker', (q) =>
+        q.eq('machineId', args.machineId).eq('workerId', args.workerId)
+      )
+      .first();
+
+    if (!worker) {
+      throw new Error('Worker not found');
+    }
+
+    // Update connected timestamp
+    await ctx.db.patch(worker._id, {
+      connectedAt: Date.now(),
+    });
+
+    console.log('[workers.markConnected] Worker marked as connected:', args.workerId);
+    return { success: true };
   },
 });

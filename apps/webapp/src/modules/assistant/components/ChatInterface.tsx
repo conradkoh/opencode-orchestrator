@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAssistantChat } from '../hooks/useAssistantChat';
 import { useAssistantSessions } from '../hooks/useAssistantSessions';
+import { useConnectWorker } from '../hooks/useConnectWorker';
 import { useMachines } from '../hooks/useMachines';
 import { useWorkerModels } from '../hooks/useWorkerModels';
 import { useWorkers } from '../hooks/useWorkers';
@@ -33,6 +34,8 @@ export function ChatInterface() {
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [showNewSession, setShowNewSession] = useState(false);
+
+  const { connectWorker } = useConnectWorker();
 
   const selectedWorker = useMemo(
     () => workers?.find((w) => w.workerId === selectedWorkerId),
@@ -67,13 +70,18 @@ export function ChatInterface() {
     }
   }, [selectedMachineId]);
 
-  // Reset state when worker changes
+  // Reset state when worker changes and request connection
   useEffect(() => {
     if (selectedWorkerId) {
       setShowNewSession(false);
       setSelectedModel(null);
+
+      // Request worker to connect and initialize opencode
+      connectWorker(selectedWorkerId).catch((error) => {
+        console.error('[ChatInterface] Failed to connect worker:', error);
+      });
     }
-  }, [selectedWorkerId]);
+  }, [selectedWorkerId, connectWorker]);
 
   // Auto-select first model when starting new session
   useEffect(() => {

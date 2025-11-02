@@ -45,6 +45,10 @@ export class ChatSessionManager {
       // Publish models to Convex
       await this.convexClient.publishModels(models);
       console.log('✅ Models published to Convex');
+
+      // Mark worker as connected
+      await this.convexClient.markConnected();
+      console.log('✅ Worker marked as connected');
     } catch (error) {
       console.error('❌ Failed to fetch/publish models:', error);
       throw error; // Fail connection if we can't get models

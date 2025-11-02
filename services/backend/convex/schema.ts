@@ -266,6 +266,8 @@ export default defineSchema({
     approvedAt: v.optional(v.number()), // When worker was approved
     approvedBy: v.optional(v.id('users')), // User who approved
     lastHeartbeat: v.optional(v.number()), // Last activity timestamp
+    connectRequestedAt: v.optional(v.number()), // When frontend requested connection
+    connectedAt: v.optional(v.number()), // When worker completed connection
   })
     .index('by_worker_id', ['workerId'])
     .index('by_machine_id', ['machineId'])

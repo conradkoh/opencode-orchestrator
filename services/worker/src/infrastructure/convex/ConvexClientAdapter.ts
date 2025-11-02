@@ -182,11 +182,55 @@ export class ConvexClientAdapter {
   }
 
   /**
+   * Start subscription to worker record for connect requests.
+   */
+  private startWorkerSubscription(): void {
+    console.log('📡 Starting worker subscription...');
+
+    let lastConnectRequest: number | undefined;
+
+    // Subscribe to worker record changes
+    this.realtimeClient.onUpdate(
+      api.workers.list,
+      { machineId: this.config.machineId },
+      (workers) => {
+        if (!workers) return;
+
+        // Find this worker
+        const thisWorker = workers.find((w) => w.workerId === this.config.workerId);
+        if (!thisWorker) return;
+
+        // Check if there's a new connect request
+        if (
+          thisWorker.connectRequestedAt &&
+          thisWorker.connectRequestedAt !== lastConnectRequest &&
+          (!thisWorker.connectedAt || thisWorker.connectRequestedAt > thisWorker.connectedAt)
+        ) {
+          lastConnectRequest = thisWorker.connectRequestedAt;
+          console.log('🔌 Connect request detected at:', thisWorker.connectRequestedAt);
+
+          // Trigger connect callback
+          if (this.connectCallback) {
+            this.connectCallback().catch((error) => {
+              console.error('❌ Error in connect callback:', error);
+            });
+          }
+        }
+      }
+    );
+
+    console.log('✅ Worker subscription active');
+  }
+
+  /**
    * Start subscriptions for chat sessions and messages.
    * Listens for new sessions and messages for this worker.
    */
   private startChatSubscriptions(): void {
     console.log('📡 Starting chat subscriptions...');
+
+    // Start worker subscription for connect requests
+    this.startWorkerSubscription();
 
     // Track which sessions we've seen
     const seenSessions = new Set<string>();
@@ -395,15 +439,12 @@ export class ConvexClientAdapter {
   }
 
   /**
-   * Handle connect request from frontend.
-   * Triggers the connect callback to initialize opencode client.
+   * Mark worker as connected after successful opencode initialization.
    */
-  async handleConnect(): Promise<void> {
-    console.log('🔌 Handling connect request...');
-    if (this.connectCallback) {
-      await this.connectCallback();
-    } else {
-      console.warn('⚠️  No connect callback registered');
-    }
+  async markConnected(): Promise<void> {
+    await this.httpClient.mutation(api.workers.markConnected, {
+      workerId: this.config.workerId,
+      machineId: this.config.machineId,
+    });
   }
 }
