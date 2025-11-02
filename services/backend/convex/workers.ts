@@ -225,7 +225,7 @@ export const reject = mutation({
 });
 
 /**
- * List all workers for a machine.
+ * List all workers for a machine (authenticated user query).
  *
  * @param machineId - Machine ID to list workers for
  * @returns Array of workers
@@ -268,6 +268,47 @@ export const list = query({
       approvedAt: worker.approvedAt,
       lastHeartbeat: worker.lastHeartbeat,
     }));
+  },
+});
+
+/**
+ * Get worker record by machine and worker ID (for worker self-subscription).
+ * Used by the worker process to subscribe to its own record for connect requests.
+ * Does not require user authentication - uses machine/worker token validation.
+ *
+ * @param machineId - Machine ID from token
+ * @param workerId - Worker ID from token
+ * @returns Worker record if found
+ */
+export const getByMachineAndWorker = query({
+  args: {
+    machineId: v.string(),
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const worker = await ctx.db
+      .query('workers')
+      .withIndex('by_machine_and_worker', (q) =>
+        q.eq('machineId', args.machineId).eq('workerId', args.workerId)
+      )
+      .first();
+
+    if (!worker) {
+      return null;
+    }
+
+    return {
+      workerId: worker.workerId,
+      machineId: worker.machineId,
+      name: worker.name,
+      approvalStatus: worker.approvalStatus,
+      status: worker.status,
+      createdAt: worker.createdAt,
+      approvedAt: worker.approvedAt,
+      lastHeartbeat: worker.lastHeartbeat,
+      connectRequestedAt: worker.connectRequestedAt,
+      connectedAt: worker.connectedAt,
+    };
   },
 });
 

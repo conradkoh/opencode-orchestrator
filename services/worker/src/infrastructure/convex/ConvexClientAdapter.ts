@@ -191,23 +191,19 @@ export class ConvexClientAdapter {
 
     // Subscribe to worker record changes
     this.realtimeClient.onUpdate(
-      api.workers.list,
-      { machineId: this.config.machineId },
-      (workers) => {
-        if (!workers) return;
-
-        // Find this worker
-        const thisWorker = workers.find((w) => w.workerId === this.config.workerId);
-        if (!thisWorker) return;
+      api.workers.getByMachineAndWorker,
+      { machineId: this.config.machineId, workerId: this.config.workerId },
+      (worker) => {
+        if (!worker) return;
 
         // Check if there's a new connect request
         if (
-          thisWorker.connectRequestedAt &&
-          thisWorker.connectRequestedAt !== lastConnectRequest &&
-          (!thisWorker.connectedAt || thisWorker.connectRequestedAt > thisWorker.connectedAt)
+          worker.connectRequestedAt &&
+          worker.connectRequestedAt !== lastConnectRequest &&
+          (!worker.connectedAt || worker.connectRequestedAt > worker.connectedAt)
         ) {
-          lastConnectRequest = thisWorker.connectRequestedAt;
-          console.log('🔌 Connect request detected at:', thisWorker.connectRequestedAt);
+          lastConnectRequest = worker.connectRequestedAt;
+          console.log('🔌 Connect request detected at:', worker.connectRequestedAt);
 
           // Trigger connect callback
           if (this.connectCallback) {
