@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { SessionIdArg } from 'convex-helpers/server/sessions';
 import { getAuthUserOptional } from '../modules/auth/getAuthUser';
 import { internal } from './_generated/api';
-import { mutation, query } from './_generated/server';
+import { internalAction, mutation, query } from './_generated/server';
 
 /**
  * Create a new worker token.
@@ -53,20 +53,24 @@ export const create = mutation({
       throw new Error('Worker ID already exists. Please try again.');
     }
 
-    // Create worker record with pending approval status
+    // Generate cryptographic secret
+    const secret = await ctx.scheduler.runAfter(0, internal.workerActions.generateSecret);
+
+    // Create worker record with pending approval status and secret
     await ctx.db.insert('workers', {
       workerId: args.workerId,
       machineId: args.machineId,
       name: args.name,
+      secret,
       approvalStatus: 'pending',
       status: 'offline',
       createdAt: Date.now(),
     });
 
-    // Return registration info
+    // Return registration info with token containing secret
     return {
       workerId: args.workerId,
-      token: `machine_${args.machineId}:worker_${args.workerId}`,
+      token: `machine_${args.machineId}:worker_${args.workerId}:secret_${secret}`,
     };
   },
 });
@@ -77,12 +81,14 @@ export const create = mutation({
  *
  * @param machineId - Machine ID from token
  * @param workerId - Worker ID from token
+ * @param secret - Cryptographic secret from token
  * @returns Authorization status and worker info
  */
 export const register = mutation({
   args: {
     machineId: v.string(),
     workerId: v.string(),
+    secret: v.string(),
   },
   handler: async (ctx, args) => {
     // Find worker by machine ID and worker ID
@@ -95,6 +101,11 @@ export const register = mutation({
 
     if (!worker) {
       throw new Error('Worker not found. Please check your worker token.');
+    }
+
+    // Validate secret
+    if (worker.secret !== args.secret) {
+      throw new Error('Invalid worker secret. Authentication failed.');
     }
 
     // Check if already approved (approval status is independent of operational status)
@@ -365,11 +376,13 @@ export const listPending = query({
  *
  * @param machineId - Machine ID from token
  * @param workerId - Worker ID from token
+ * @param secret - Cryptographic secret from token
  */
 export const heartbeat = mutation({
   args: {
     machineId: v.string(),
     workerId: v.string(),
+    secret: v.string(),
   },
   handler: async (ctx, args) => {
     const worker = await ctx.db
@@ -381,6 +394,11 @@ export const heartbeat = mutation({
 
     if (!worker) {
       throw new Error('Unauthorized: Worker not found');
+    }
+
+    // Validate secret
+    if (worker.secret !== args.secret) {
+      throw new Error('Invalid worker secret. Authentication failed.');
     }
 
     // Only update heartbeat if worker is approved
@@ -404,11 +422,13 @@ export const heartbeat = mutation({
  *
  * @param machineId - Machine ID from token
  * @param workerId - Worker ID from token
+ * @param secret - Cryptographic secret from token
  */
 export const setOffline = mutation({
   args: {
     machineId: v.string(),
     workerId: v.string(),
+    secret: v.string(),
   },
   handler: async (ctx, args) => {
     const worker = await ctx.db
@@ -420,6 +440,11 @@ export const setOffline = mutation({
 
     if (!worker) {
       return; // Worker doesn't exist, nothing to update
+    }
+
+    // Validate secret
+    if (worker.secret !== args.secret) {
+      throw new Error('Invalid worker secret. Authentication failed.');
     }
 
     // Update status to offline
@@ -537,12 +562,14 @@ export const requestConnect = mutation({
  *
  * @param workerId - Worker ID
  * @param machineId - Machine ID
+ * @param secret - Cryptographic secret from token
  * @returns Success status
  */
 export const markConnected = mutation({
   args: {
     workerId: v.string(),
     machineId: v.string(),
+    secret: v.string(),
   },
   handler: async (ctx, args) => {
     // Find worker
@@ -557,6 +584,11 @@ export const markConnected = mutation({
       throw new Error('Worker not found');
     }
 
+    // Validate secret
+    if (worker.secret !== args.secret) {
+      throw new Error('Invalid worker secret. Authentication failed.');
+    }
+
     // Update connected timestamp
     await ctx.db.patch(worker._id, {
       connectedAt: Date.now(),
@@ -564,5 +596,53 @@ export const markConnected = mutation({
 
     console.log('[workers.markConnected] Worker marked as connected:', args.workerId);
     return { success: true };
+  },
+});
+
+/**
+ * Get worker token for an existing worker.
+ * Allows users to retrieve their worker token if they lost it.
+ * Only the machine owner can retrieve tokens.
+ *
+ * @param workerId - Worker ID to get token for
+ * @returns Worker token in format machine_<id>:worker_<id>:secret_<secret>
+ */
+export const getToken = query({
+  args: {
+    ...SessionIdArg,
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Verify user is authenticated
+    const user = await getAuthUserOptional(ctx, args);
+    if (!user) {
+      throw new Error('Unauthorized: Must be logged in to get worker token');
+    }
+
+    // Find worker
+    const worker = await ctx.db
+      .query('workers')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .first();
+
+    if (!worker) {
+      throw new Error('Worker not found');
+    }
+
+    // Verify user owns the machine
+    const machine = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', worker.machineId))
+      .first();
+
+    if (!machine || machine.userId !== user._id) {
+      throw new Error('Unauthorized: You do not own this machine');
+    }
+
+    // Return token
+    return {
+      workerId: worker.workerId,
+      token: `machine_${worker.machineId}:worker_${worker.workerId}:secret_${worker.secret}`,
+    };
   },
 });

@@ -27,6 +27,7 @@ import type * as migration from "../migration.js";
 import type * as presentations from "../presentations.js";
 import type * as serviceDesk from "../serviceDesk.js";
 import type * as system_auth_google from "../system/auth/google.js";
+import type * as workerActions from "../workerActions.js";
 import type * as workerModels from "../workerModels.js";
 import type * as workers from "../workers.js";
 
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   presentations: typeof presentations;
   serviceDesk: typeof serviceDesk;
   "system/auth/google": typeof system_auth_google;
+  workerActions: typeof workerActions;
   workerModels: typeof workerModels;
   workers: typeof workers;
 }>;

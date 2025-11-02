@@ -260,6 +260,7 @@ export default defineSchema({
     workerId: v.string(), // Client-generated nanoid
     machineId: v.string(), // Reference to parent machine
     name: v.optional(v.string()), // Optional user-friendly name
+    secret: v.string(), // Cryptographic secret for authentication (stored plain for retrieval)
     approvalStatus: v.union(v.literal('pending'), v.literal('approved'), v.literal('revoked')),
     status: v.union(v.literal('offline'), v.literal('online')),
     createdAt: v.number(), // When worker was created

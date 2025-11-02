@@ -7,16 +7,16 @@ import { z } from 'zod';
  */
 const envSchema = z.object({
   /**
-   * Worker authentication token.
-   * Format: machine_<machine_id>:worker_<worker_id>
-   * Example: machine_abc123:worker_xyz789
+   * Worker authentication token with cryptographic secret.
+   * Format: machine_<machine_id>:worker_<worker_id>:secret_<secret>
+   * Example: machine_abc123:worker_xyz789:secret_def456ghi789
    */
   WORKER_TOKEN: z
     .string()
     .min(1, 'WORKER_TOKEN is required')
     .regex(
-      /^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+$/,
-      'WORKER_TOKEN must be in format: machine_<machine_id>:worker_<worker_id>'
+      /^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+:secret_[a-zA-Z0-9_-]+$/,
+      'WORKER_TOKEN must be in format: machine_<machine_id>:worker_<worker_id>:secret_<secret>'
     ),
 
   /**
@@ -45,6 +45,8 @@ export interface WorkerConfig {
   machineId: string;
   /** Worker ID extracted from worker token */
   workerId: string;
+  /** Cryptographic secret extracted from worker token */
+  secret: string;
   /** Convex backend URL */
   convexUrl: string;
   /** Original worker token */
@@ -127,7 +129,7 @@ export function getEnv(): Env {
 
 /**
  * Parse worker configuration from validated environment.
- * Extracts machine ID and worker ID from the worker token.
+ * Extracts machine ID, worker ID, and secret from the worker token.
  *
  * @param env - Validated environment variables
  * @returns Parsed worker configuration
@@ -140,15 +142,17 @@ export function getEnv(): Env {
  * ```
  */
 export function parseWorkerConfig(env: Env): WorkerConfig {
-  // Token format: machine_<machine_id>:worker_<worker_id>
-  const [machinePart, workerPart] = env.WORKER_TOKEN.split(':');
+  // Token format: machine_<machine_id>:worker_<worker_id>:secret_<secret>
+  const [machinePart, workerPart, secretPart] = env.WORKER_TOKEN.split(':');
 
   const machineId = machinePart.replace('machine_', '');
   const workerId = workerPart.replace('worker_', '');
+  const secret = secretPart.replace('secret_', '');
 
   return {
     machineId,
     workerId,
+    secret,
     convexUrl: env.CONVEX_URL,
     workerToken: env.WORKER_TOKEN,
   };

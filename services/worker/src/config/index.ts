@@ -61,9 +61,11 @@ export async function interactiveSetup(): Promise<void> {
     workerToken = await promptForInput('Enter worker token: ');
 
     // Validate token format
-    if (!workerToken.match(/^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+$/)) {
+    if (
+      !workerToken.match(/^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+:secret_[a-zA-Z0-9_-]+$/)
+    ) {
       throw new Error(
-        'Invalid worker token format. Expected: machine_<machine_id>:worker_<worker_id>'
+        'Invalid worker token format. Expected: machine_<machine_id>:worker_<worker_id>:secret_<secret>'
       );
     }
   }
@@ -118,8 +120,8 @@ async function promptForInput(prompt: string): Promise<string> {
 async function saveEnvFile(workerToken: string, convexUrl: string): Promise<void> {
   const envPath = path.join(process.cwd(), '.env');
 
-  const envContent = `# Worker authentication token
-# Format: machine_<machine_id>:worker_<worker_id>
+  const envContent = `# Worker authentication token with cryptographic secret
+# Format: machine_<machine_id>:worker_<worker_id>:secret_<secret>
 # Get this from the web UI by selecting your machine and clicking "Add Worker"
 WORKER_TOKEN=${workerToken}
 

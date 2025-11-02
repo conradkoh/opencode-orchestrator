@@ -64,6 +64,7 @@ export class ConvexClientAdapter {
       const result = await this.httpClient.mutation(api.workers.register, {
         machineId: this.config.machineId,
         workerId: this.config.workerId,
+        secret: this.config.secret,
       });
 
       // If approved, start heartbeat and chat subscriptions
@@ -129,6 +130,7 @@ export class ConvexClientAdapter {
     await this.httpClient.mutation(api.workers.heartbeat, {
       machineId: this.config.machineId,
       workerId: this.config.workerId,
+      secret: this.config.secret,
     });
   }
 
@@ -148,6 +150,7 @@ export class ConvexClientAdapter {
       await this.httpClient.mutation(api.workers.setOffline, {
         machineId: this.config.machineId,
         workerId: this.config.workerId,
+        secret: this.config.secret,
       });
     } catch (error) {
       console.error(
@@ -441,6 +444,7 @@ export class ConvexClientAdapter {
     await this.httpClient.mutation(api.workers.markConnected, {
       workerId: this.config.workerId,
       machineId: this.config.machineId,
+      secret: this.config.secret,
     });
   }
 }

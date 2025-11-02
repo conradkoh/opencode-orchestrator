@@ -31,14 +31,16 @@ The worker service uses a robust, Zod-based environment configuration system tha
 ### Required Variables
 
 #### `WORKER_TOKEN`
-- **Format**: `machine_<machine_id>:worker_<worker_id>`
-- **Example**: `machine_abc123:worker_xyz789`
+- **Format**: `machine_<machine_id>:worker_<worker_id>:secret_<secret>`
+- **Example**: `machine_abc123:worker_xyz789:secret_def456ghi789jkl012`
+- **Security**: The secret is a cryptographically secure random string (32 bytes, base64url-encoded) that authenticates this worker with the backend
 - **How to Get**:
   1. Go to the web UI
   2. Select your machine
   3. Click the menu (⋮) next to the machine
   4. Select "Add Worker"
-  5. Copy the token shown
+  5. Copy the token shown (includes the secret)
+- **Note**: Keep this token secure! Anyone with this token can authenticate as this worker
 
 #### `CONVEX_URL`
 - **Format**: HTTPS URL
@@ -131,9 +133,10 @@ src/config/
 ## Validation Rules
 
 ### Worker Token
-- Must match format: `machine_<machine_id>:worker_<worker_id>`
-- Machine ID and worker ID must be non-empty
-- Uses regex validation: `/^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+$/`
+- Must match format: `machine_<machine_id>:worker_<worker_id>:secret_<secret>`
+- Machine ID, worker ID, and secret must all be non-empty
+- Uses regex validation: `/^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+:secret_[a-zA-Z0-9_-]+$/`
+- Secret is a base64url-encoded string (URL-safe characters only)
 
 ### Convex URL
 - Must be a valid URL
