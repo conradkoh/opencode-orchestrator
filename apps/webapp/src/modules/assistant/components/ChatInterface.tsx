@@ -4,6 +4,7 @@ import { FolderIcon, ServerIcon, StopCircleIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useAppUrlState } from '../hooks/useAppUrlState';
 import { useAssistantChat } from '../hooks/useAssistantChat';
 import { useAssistantSessions } from '../hooks/useAssistantSessions';
 import { useConnectWorker } from '../hooks/useConnectWorker';
@@ -21,17 +22,30 @@ import { SessionList } from './SessionList';
  * Main chat interface component for orchestrating assistants.
  * Handles assistant selection, session management, and chat messaging.
  *
+ * Uses URL query parameters to persist selection state:
+ * - ?machineId=xxx - Selected machine
+ * - ?workerId=xxx - Selected worker
+ * - ?sessionId=xxx - Active session
+ *
  * @example
  * ```typescript
  * <ChatInterface />
  * ```
  */
 export function ChatInterface() {
-  const { machines, loading: machinesLoading } = useMachines();
-  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  // URL state management (single source of truth)
+  const { state: urlState, actions: urlActions } = useAppUrlState();
+  const {
+    machineId: selectedMachineId,
+    workerId: selectedWorkerId,
+    sessionId: urlSessionId,
+  } = urlState;
 
+  // Data fetching
+  const { machines, loading: machinesLoading } = useMachines();
   const { workers, loading: workersLoading } = useWorkers(selectedMachineId || '');
-  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
+
+  // Local UI state (not persisted to URL)
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [showNewSession, setShowNewSession] = useState(false);
 
@@ -43,7 +57,7 @@ export function ChatInterface() {
   );
 
   // Get available models from worker (fetched from opencode)
-  const { models: workerModels, loading: modelsLoading } = useWorkerModels(selectedWorkerId);
+  const { models: workerModels } = useWorkerModels(selectedWorkerId);
   const availableModels = useMemo(() => workerModels?.map((m) => m.id) || [], [workerModels]);
 
   const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedWorkerId);
@@ -55,33 +69,36 @@ export function ChatInterface() {
     console.log('[ChatInterface] State:', {
       selectedMachineId,
       selectedWorkerId,
+      urlSessionId,
       session,
       messagesCount: messages.length,
       showNewSession,
     });
-  }, [selectedMachineId, selectedWorkerId, session, messages.length, showNewSession]);
+  }, [selectedMachineId, selectedWorkerId, urlSessionId, session, messages.length, showNewSession]);
 
-  // Reset worker selection when machine changes
-  useEffect(() => {
-    if (selectedMachineId !== null) {
-      setSelectedWorkerId(null);
-      setShowNewSession(false);
-      setSelectedModel(null);
-    }
-  }, [selectedMachineId]);
-
-  // Reset state when worker changes and request connection
+  // Request worker connection when worker is selected
+  // This is a side effect (network request), not state synchronization
   useEffect(() => {
     if (selectedWorkerId) {
-      setShowNewSession(false);
-      setSelectedModel(null);
-
       // Request worker to connect and initialize opencode
       connectWorker(selectedWorkerId).catch((error) => {
         console.error('[ChatInterface] Failed to connect worker:', error);
       });
     }
   }, [selectedWorkerId, connectWorker]);
+
+  // Restore session from URL on mount or when URL session changes
+  // This is a side effect (restore session), not state synchronization
+  useEffect(() => {
+    if (urlSessionId && selectedWorkerId && !session) {
+      console.log('[ChatInterface] Restoring session from URL:', urlSessionId);
+      restoreSession(urlSessionId).catch((error) => {
+        console.error('[ChatInterface] Failed to restore session from URL:', error);
+        // Clear invalid session from URL
+        urlActions.setSessionId(null);
+      });
+    }
+  }, [urlSessionId, selectedWorkerId, session, restoreSession, urlActions]);
 
   // Auto-select first model when starting new session
   useEffect(() => {
@@ -92,17 +109,31 @@ export function ChatInterface() {
 
   /**
    * Handles machine selection change.
+   * Updates URL which triggers re-render with new state.
    */
-  const handleMachineChange = useCallback((machineId: string) => {
-    setSelectedMachineId(machineId);
-  }, []);
+  const handleMachineChange = useCallback(
+    (machineId: string) => {
+      urlActions.setMachineId(machineId);
+      // Reset local UI state
+      setShowNewSession(false);
+      setSelectedModel(null);
+    },
+    [urlActions]
+  );
 
   /**
    * Handles worker selection change.
+   * Updates URL which triggers re-render with new state.
    */
-  const handleWorkerChange = useCallback((workerId: string) => {
-    setSelectedWorkerId(workerId);
-  }, []);
+  const handleWorkerChange = useCallback(
+    (workerId: string) => {
+      urlActions.setWorkerId(workerId);
+      // Reset local UI state
+      setShowNewSession(false);
+      setSelectedModel(null);
+    },
+    [urlActions]
+  );
 
   /**
    * Handles starting a new chat session with the selected model.
@@ -110,12 +141,16 @@ export function ChatInterface() {
   const handleStartSession = useCallback(async () => {
     if (!selectedModel) return;
     try {
-      await startSession(selectedModel);
+      const newSessionId = await startSession(selectedModel);
       setShowNewSession(false);
+      // Update URL with new session ID
+      if (newSessionId) {
+        urlActions.setSessionId(newSessionId);
+      }
     } catch (error) {
       console.error('Failed to start session:', error);
     }
-  }, [selectedModel, startSession]);
+  }, [selectedModel, startSession, urlActions]);
 
   /**
    * Handles restoring an existing session.
@@ -126,12 +161,14 @@ export function ChatInterface() {
       try {
         await restoreSession(sessionId);
         setShowNewSession(false);
+        // Update URL with restored session ID
+        urlActions.setSessionId(sessionId);
         console.log('[ChatInterface] Session restored successfully');
       } catch (error) {
         console.error('Failed to restore session:', error);
       }
     },
-    [restoreSession]
+    [restoreSession, urlActions]
   );
 
   /**
@@ -142,10 +179,12 @@ export function ChatInterface() {
       await endSession();
       setSelectedModel(null);
       setShowNewSession(false);
+      // Clear session from URL
+      urlActions.setSessionId(null);
     } catch (error) {
       console.error('Failed to end session:', error);
     }
-  }, [endSession]);
+  }, [endSession, urlActions]);
 
   /**
    * Handles sending a message to the active session.
