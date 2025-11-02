@@ -42,16 +42,56 @@ export class OpencodeClientAdapter implements IOpencodeClient {
    * @returns OpenCode client instance
    * @throws Error if OpenCode fails to start or directory is invalid
    */
+  /**
+   * Check if a port is available.
+   */
+  private async isPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const net = require('net');
+      const server = net.createServer();
+
+      server.once('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          resolve(false);
+        } else {
+          resolve(false);
+        }
+      });
+
+      server.once('listening', () => {
+        server.close();
+        resolve(true);
+      });
+
+      server.listen(port);
+    });
+  }
+
+  /**
+   * Find an available port in the given range.
+   */
+  private async findAvailablePort(minPort: number, maxPort: number): Promise<number> {
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const port = Math.floor(Math.random() * (maxPort - minPort + 1)) + minPort;
+      if (await this.isPortAvailable(port)) {
+        return port;
+      }
+      console.log(`⚠️  Port ${port} is in use, trying another...`);
+    }
+    throw new Error(`Could not find available port after ${maxAttempts} attempts`);
+  }
+
   async createClient(directory: string): Promise<IOpencodeInstance> {
     try {
-      // Generate random port between 3000-9999 to avoid conflicts
-      const randomPort = Math.floor(Math.random() * 7000) + 3000;
+      // Find an available port between 3000-9999
+      const port = await this.findAvailablePort(3000, 9999);
 
-      console.log(`🔌 Starting opencode server on port ${randomPort}`);
+      console.log(`🔌 Starting opencode server on port ${port}`);
 
       // Create OpenCode server and client
       const { client, server } = await createOpencode({
-        port: randomPort,
+        port,
         config: {
           // OpenCode will use the directory parameter in API calls
         },
