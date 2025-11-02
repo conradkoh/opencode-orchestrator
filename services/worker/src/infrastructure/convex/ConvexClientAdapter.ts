@@ -367,4 +367,17 @@ export class ConvexClientAdapter {
       chatSessionId: sessionId,
     });
   }
+
+  /**
+   * Publish available models to Convex.
+   * Called when opencode client initializes.
+   */
+  async publishModels(
+    models: Array<{ id: string; name: string; provider: string }>
+  ): Promise<void> {
+    await this.httpClient.mutation(api.workerModels.updateModels, {
+      workerId: this.config.workerId,
+      models,
+    });
+  }
 }

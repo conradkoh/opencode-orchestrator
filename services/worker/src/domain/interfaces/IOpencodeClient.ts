@@ -84,6 +84,23 @@ export interface IOpencodeClient {
   createClient(directory: string): Promise<IOpencodeInstance>;
 
   /**
+   * Lists all available AI models from the OpenCode server.
+   *
+   * @param client - OpenCode client instance
+   * @returns Array of available models with their metadata
+   * @throws Error if listing fails
+   *
+   * @see https://opencode.ai/docs/sdk/#models
+   */
+  listModels(client: IOpencodeInstance): Promise<
+    Array<{
+      id: string;
+      name: string;
+      provider: string;
+    }>
+  >;
+
+  /**
    * Creates a new chat session with specified model.
    *
    * @param client - OpenCode client instance

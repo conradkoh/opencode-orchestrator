@@ -275,6 +275,22 @@ export default defineSchema({
     .index('by_machine_and_approval_status', ['machineId', 'approvalStatus']),
 
   /**
+   * Available AI models for each worker.
+   * Updated by worker when opencode client initializes.
+   */
+  workerModels: defineTable({
+    workerId: v.string(), // Worker this model list belongs to
+    models: v.array(
+      v.object({
+        id: v.string(), // Model ID (e.g., "anthropic/claude-3-5-sonnet-20241022")
+        name: v.string(), // Display name (e.g., "Claude 3.5 Sonnet")
+        provider: v.string(), // Provider (e.g., "anthropic")
+      })
+    ),
+    updatedAt: v.number(), // When this list was last updated
+  }).index('by_worker_id', ['workerId']),
+
+  /**
    * Chat sessions for worker conversations.
    * Each session represents a conversation with an AI model on a specific worker.
    * Sessions can be active, idle (resumable), or terminated.

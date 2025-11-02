@@ -21,12 +21,28 @@ export class ChatSessionManager {
 
   /**
    * Initialize opencode client if not already initialized.
+   * Also fetches and publishes available models to Convex.
    */
   private async ensureOpencodeClient(): Promise<void> {
     if (!this.opencodeClient) {
       console.log(`🔧 Initializing opencode client for directory: ${this.workingDirectory}`);
       this.opencodeClient = await this.opencodeAdapter.createClient(this.workingDirectory);
       console.log('✅ Opencode client initialized');
+
+      // Fetch and publish available models
+      try {
+        console.log('📋 Fetching available models from opencode...');
+        const models = await this.opencodeAdapter.listModels(this.opencodeClient);
+        console.log(`✅ Found ${models.length} models:`, models.map((m) => m.id).join(', '));
+
+        // Publish models to Convex
+        await this.convexClient.publishModels(models);
+        console.log('✅ Models published to Convex');
+      } catch (error) {
+        console.error('❌ Failed to fetch/publish models:', error);
+        // Don't fail initialization if models fetch fails
+        // The worker can still function with hardcoded models
+      }
     }
   }
 

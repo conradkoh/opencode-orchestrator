@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAssistantChat } from '../hooks/useAssistantChat';
 import { useAssistantSessions } from '../hooks/useAssistantSessions';
 import { useMachines } from '../hooks/useMachines';
+import { useWorkerModels } from '../hooks/useWorkerModels';
 import { useWorkers } from '../hooks/useWorkers';
 import { AssistantSelector } from './AssistantSelector';
 import { ChatInput } from './ChatInput';
@@ -38,8 +39,9 @@ export function ChatInterface() {
     [workers, selectedWorkerId]
   );
 
-  // TODO: Get available models from worker when backend implements it
-  const availableModels = useMemo(() => ['claude-sonnet-4-5', 'claude-opus-4', 'gpt-4'], []);
+  // Get available models from worker (fetched from opencode)
+  const { models: workerModels, loading: modelsLoading } = useWorkerModels(selectedWorkerId);
+  const availableModels = useMemo(() => workerModels?.map((m) => m.id) || [], [workerModels]);
 
   const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedWorkerId);
   const { session, startSession, restoreSession, endSession, messages, sendMessage, isLoading } =

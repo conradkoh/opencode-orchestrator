@@ -354,3 +354,29 @@ export interface RemoveWorkerReturn {
   /** Error object if removal failed, null otherwise */
   error: Error | null;
 }
+
+// Model-related types
+
+/**
+ * Represents an AI model available for a worker.
+ */
+export interface WorkerModel {
+  /** Model ID (e.g., "anthropic/claude-3-5-sonnet-20241022") */
+  id: string;
+  /** Display name (e.g., "Claude 3.5 Sonnet") */
+  name: string;
+  /** Provider (e.g., "anthropic") */
+  provider: string;
+}
+
+/**
+ * Available models data for a worker.
+ */
+export interface WorkerModelsData {
+  /** Array of available models, or null if not yet loaded */
+  models: WorkerModel[] | null;
+  /** When the models list was last updated */
+  updatedAt: number | null;
+  /** Whether models are currently loading */
+  loading: boolean;
+}

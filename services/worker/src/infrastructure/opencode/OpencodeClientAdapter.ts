@@ -117,6 +117,40 @@ export class OpencodeClientAdapter implements IOpencodeClient {
   }
 
   /**
+   * Lists all available AI models from the OpenCode server.
+   *
+   * @param client - OpenCode client instance
+   * @returns Array of available models with their metadata
+   * @throws Error if listing fails
+   */
+  async listModels(
+    client: IOpencodeInstance
+  ): Promise<Array<{ id: string; name: string; provider: string }>> {
+    try {
+      const instance = client as OpencodeInstanceInternal;
+      const sdkClient = instance._internal.client;
+
+      // SDK: client.model.list()
+      const result = await sdkClient.model.list();
+
+      if (!result.data || !Array.isArray(result.data)) {
+        throw new Error('Invalid response from OpenCode models API');
+      }
+
+      // Transform SDK model format to our format
+      return result.data.map((model: any) => ({
+        id: `${model.providerID}/${model.modelID}`,
+        name: model.name || model.modelID,
+        provider: model.providerID,
+      }));
+    } catch (error) {
+      throw new Error(
+        `Failed to list models: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
    * Creates a new chat session with specified model.
    *
    * @param client - OpenCode client instance
