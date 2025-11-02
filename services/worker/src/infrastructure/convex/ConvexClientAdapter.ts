@@ -218,19 +218,37 @@ export class ConvexClientAdapter {
           if (!processedMessages.has(messageKey) && message.role === 'user' && message.completed) {
             processedMessages.add(messageKey);
             console.log(
-              '📨 New message detected:',
+              '📨 New user message detected:',
               message.messageId,
               'in session:',
               message.sessionId
             );
 
-            // Notify callback
+            // Find the corresponding assistant message (created right after user message)
+            const assistantMessage = messages.find(
+              (m) =>
+                m.sessionId === message.sessionId &&
+                m.role === 'assistant' &&
+                !m.completed &&
+                m.timestamp > message.timestamp
+            );
+
+            if (!assistantMessage) {
+              console.error('❌ No assistant message found for user message:', message.messageId);
+              continue;
+            }
+
+            console.log('📝 Found assistant message:', assistantMessage.messageId);
+
+            // Notify callback with assistant message ID (where response should be written)
             if (this.messageCallback) {
-              this.messageCallback(message.sessionId, message.messageId, message.content).catch(
-                (error) => {
-                  console.error('❌ Error in message callback:', error);
-                }
-              );
+              this.messageCallback(
+                message.sessionId,
+                assistantMessage.messageId,
+                message.content
+              ).catch((error) => {
+                console.error('❌ Error in message callback:', error);
+              });
             }
           }
         }

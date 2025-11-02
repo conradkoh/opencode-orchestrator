@@ -385,13 +385,13 @@ export const subscribeToChunks = query({
 3. **Update useAssistantSessions**: Replace mock with real Convex query
 4. **Testing**: Verify UI can start sessions and send messages
 
-### Phase 3: Worker Service Integration 🆕
+### Phase 3: Worker Service Integration ✅
 
-1. **ChatSessionManager**: Create session lifecycle manager
-2. **MessageProcessor**: Create message processing logic
-3. **ConvexClientAdapter**: Add chat subscriptions and methods
-4. **MachineServer**: Integrate chat manager
-5. **Testing**: End-to-end flow from UI → Worker → UI
+1. **Backend Worker Queries**: Added subscribeToWorkerSessions and subscribeToWorkerMessages ✅
+2. **ConvexClientAdapter**: Implemented real-time chat subscriptions ✅
+3. **ChatSessionManager**: Created session lifecycle manager with mock processing ✅
+4. **MachineServer**: Integrated chat manager with event callbacks ✅
+5. **Testing**: Ready for end-to-end testing ⏳
 
 ### Phase 4: Streaming & Polish ✨
 
