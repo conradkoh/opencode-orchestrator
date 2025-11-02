@@ -37,28 +37,35 @@ export class ChatSessionManager {
     console.log(`🚀 Starting session ${sessionId} with model ${model}`);
 
     try {
-      // Ensure opencode client is initialized
-      await this.ensureOpencodeClient();
-
-      // Create opencode session
-      // Note: We use the Convex sessionId as the opencode session ID
-      // This allows us to resume sessions later
-      const opencodeSession = await this.opencodeAdapter.createSession(this.opencodeClient!, model);
-      console.log(`📝 Opencode session created: ${opencodeSession.id}`);
-
-      // Store session info
+      // Store session info FIRST (before async operations)
+      // This prevents race conditions where messages arrive before session is ready
       this.activeSessions.set(sessionId, {
         sessionId,
         model,
         startedAt: Date.now(),
-        opencodeSessionId: opencodeSession.id,
+        isInitializing: true,
       });
+
+      // Ensure opencode client is initialized
+      await this.ensureOpencodeClient();
+
+      // Create opencode session
+      const opencodeSession = await this.opencodeAdapter.createSession(this.opencodeClient!, model);
+      console.log(`📝 Opencode session created: ${opencodeSession.id}`);
+
+      // Update session with opencode session ID
+      const session = this.activeSessions.get(sessionId);
+      if (session) {
+        session.opencodeSessionId = opencodeSession.id;
+        session.isInitializing = false;
+      }
 
       // Mark session as ready
       await this.convexClient.sessionReady(sessionId);
       console.log(`✅ Session ${sessionId} ready`);
     } catch (error) {
       console.error(`❌ Failed to start session ${sessionId}:`, error);
+      this.activeSessions.delete(sessionId);
       throw error;
     }
   }
@@ -78,18 +85,40 @@ export class ChatSessionManager {
   async processMessage(sessionId: string, messageId: string, content: string): Promise<void> {
     console.log(`📨 Processing message in session ${sessionId}:`, content);
 
-    const session = this.activeSessions.get(sessionId);
-    if (!session) {
-      console.error(`❌ Session ${sessionId} not found`);
-      return;
-    }
-
-    if (!session.opencodeSessionId) {
-      console.error(`❌ No opencode session ID for ${sessionId}`);
-      return;
-    }
-
     try {
+      const session = this.activeSessions.get(sessionId);
+      if (!session) {
+        const errorMsg = `Session ${sessionId} not found`;
+        console.error(`❌ ${errorMsg}`);
+        await this.writeError(sessionId, messageId, errorMsg);
+        return;
+      }
+
+      // Wait for session to finish initializing
+      if (session.isInitializing) {
+        console.log(`⏳ Waiting for session ${sessionId} to finish initializing...`);
+        // Wait up to 30 seconds for initialization
+        const maxWaitTime = 30000;
+        const startTime = Date.now();
+        while (session.isInitializing && Date.now() - startTime < maxWaitTime) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (session.isInitializing) {
+          const errorMsg = 'Session initialization timeout';
+          console.error(`❌ ${errorMsg}`);
+          await this.writeError(sessionId, messageId, errorMsg);
+          return;
+        }
+        console.log(`✅ Session ${sessionId} initialization complete, proceeding with message`);
+      }
+
+      if (!session.opencodeSessionId) {
+        const errorMsg = `No opencode session ID for ${sessionId}`;
+        console.error(`❌ ${errorMsg}`);
+        await this.writeError(sessionId, messageId, errorMsg);
+        return;
+      }
+
       await this.ensureOpencodeClient();
 
       // Send prompt to opencode and stream response
@@ -114,11 +143,22 @@ export class ChatSessionManager {
       await this.convexClient.completeMessage(sessionId, messageId, fullResponse);
       console.log(`✅ Message ${messageId} completed (${fullResponse.length} chars total)`);
     } catch (error) {
-      console.error(`❌ Failed to process message ${messageId}:`, error);
-      // Write error message to chat
-      const errorMessage = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Failed to process message ${messageId}:`, errorMsg);
+      await this.writeError(sessionId, messageId, errorMsg);
+    }
+  }
+
+  /**
+   * Write an error message to chat and mark message as complete.
+   */
+  private async writeError(sessionId: string, messageId: string, error: string): Promise<void> {
+    try {
+      const errorMessage = `❌ Error: ${error}`;
       await this.convexClient.writeChunk(sessionId, messageId, errorMessage, 0);
       await this.convexClient.completeMessage(sessionId, messageId, errorMessage);
+    } catch (writeError) {
+      console.error('❌ Failed to write error message:', writeError);
     }
   }
 
@@ -135,4 +175,5 @@ interface SessionInfo {
   model: string;
   startedAt: number;
   opencodeSessionId?: string;
+  isInitializing?: boolean;
 }

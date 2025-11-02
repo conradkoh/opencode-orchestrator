@@ -44,13 +44,20 @@ export class OpencodeClientAdapter implements IOpencodeClient {
    */
   async createClient(directory: string): Promise<IOpencodeInstance> {
     try {
+      // Generate random port between 3000-9999 to avoid conflicts
+      const randomPort = Math.floor(Math.random() * 7000) + 3000;
+
+      console.log(`🔌 Starting opencode server on port ${randomPort}`);
+
       // Create OpenCode server and client
-      // SDK automatically starts server on localhost
       const { client, server } = await createOpencode({
+        port: randomPort,
         config: {
           // OpenCode will use the directory parameter in API calls
         },
       });
+
+      console.log(`✅ Opencode server started at ${server.url}`);
 
       const instance: OpencodeInstanceInternal = {
         __brand: 'OpencodeClient',
