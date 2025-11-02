@@ -221,8 +221,10 @@ export interface Worker {
   machineId: string;
   /** Optional user-friendly name for the worker */
   name?: string;
-  /** Current authorization/connection status */
-  status: 'pending_authorization' | 'ready' | 'online' | 'offline';
+  /** Authorization status (persistent across restarts) */
+  approvalStatus: 'pending' | 'approved' | 'revoked';
+  /** Operational status (transient) */
+  status: 'offline' | 'online';
   /** Timestamp when the worker was created */
   createdAt: number;
   /** Timestamp when the worker was approved (if approved) */
@@ -241,8 +243,10 @@ export interface PendingWorker {
   machineId: string;
   /** Optional user-friendly name for the worker */
   name?: string;
-  /** Status is always pending_authorization for this type */
-  status: 'pending_authorization';
+  /** Authorization status is always pending for this type */
+  approvalStatus: 'pending';
+  /** Operational status (always offline when pending) */
+  status: 'offline';
   /** Timestamp when the worker was created */
   createdAt: number;
 }

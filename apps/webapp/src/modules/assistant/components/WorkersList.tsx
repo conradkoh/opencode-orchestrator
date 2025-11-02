@@ -40,9 +40,9 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
     }
 
     return {
-      active: workers.filter((w) => w.status === 'online' || w.status === 'ready'),
-      offline: workers.filter((w) => w.status === 'offline'),
-      pending: workers.filter((w) => w.status === 'pending_authorization'),
+      active: workers.filter((w) => w.approvalStatus === 'approved' && w.status === 'online'),
+      offline: workers.filter((w) => w.approvalStatus === 'approved' && w.status === 'offline'),
+      pending: workers.filter((w) => w.approvalStatus === 'pending'),
     };
   }, [workers]);
 

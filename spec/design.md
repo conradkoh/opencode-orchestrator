@@ -158,10 +158,25 @@ Backend --> Frontend: Complete message available
 
 **Worker Authorization Flow**
 
-- New workers start in `pending_authorization` state
+Workers have two independent status dimensions:
+
+1. **Approval Status** (authorization dimension):
+   - `pending` - Waiting for user approval (initial state)
+   - `approved` - User has authorized this worker
+   - `revoked` - User has revoked authorization
+
+2. **Operational Status** (runtime dimension):
+   - `offline` - Worker is not running
+   - `online` - Worker is actively connected
+
+Key behaviors:
+- New workers start with `approvalStatus: pending` and `status: offline`
 - Worker polls backend every 5 seconds for approval
 - User approves workers through machine settings UI
-- Approved workers transition to `ready` state, then `online` when active
+- Once approved, `approvalStatus` becomes `approved` (permanent unless revoked)
+- When worker connects, `status` changes to `online`
+- When worker disconnects, `status` changes to `offline`
+- Approved workers remain approved across restarts (offline → online transitions)
 - Workers can be individually revoked without affecting others
 
 **Chat Interface**
@@ -224,7 +239,7 @@ Backend --> Frontend: Complete message available
 - Worker state is fully recoverable using only the worker token
 - Worker process can die and restart without data loss
 - On restart, worker queries Convex to restore:
-  - Authorization status
+  - Approval status (persistent across restarts)
   - Active chat sessions
   - Pending tasks
 
@@ -235,6 +250,7 @@ Backend --> Frontend: Complete message available
 - Graceful recovery from worker crashes
 - Simplified worker deployment (no local state to backup)
 - Workers automatically resume approved status on restart
+- Approval status is independent of operational status (offline/online)
 
 ### ID Allocation Strategy
 

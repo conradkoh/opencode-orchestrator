@@ -202,16 +202,18 @@ export function ChatInterface() {
             {workers && workers.length > 0 ? (
               <>
                 <AssistantSelector
-                  assistants={workers.map((w) => ({
-                    assistantId: w.workerId,
-                    machineId: w.machineId,
-                    machineName: machines?.find((m) => m.machineId === w.machineId)?.name || '',
-                    workingDirectory: w.name || w.workerId,
-                    displayName: w.name || `Worker ${w.workerId.slice(0, 8)}`,
-                    status: w.status === 'online' ? 'online' : 'offline',
-                    activeSessionCount: 0,
-                    availableModels: [],
-                  }))}
+                  assistants={workers
+                    .filter((w) => w.approvalStatus === 'approved')
+                    .map((w) => ({
+                      assistantId: w.workerId,
+                      machineId: w.machineId,
+                      machineName: machines?.find((m) => m.machineId === w.machineId)?.name || '',
+                      workingDirectory: w.name || w.workerId,
+                      displayName: w.name || `Worker ${w.workerId.slice(0, 8)}`,
+                      status: w.status === 'online' ? 'online' : 'offline',
+                      activeSessionCount: 0,
+                      availableModels: [],
+                    }))}
                   selectedAssistantId={selectedWorkerId}
                   onAssistantChange={handleWorkerChange}
                   disabled={workersLoading || !!session}

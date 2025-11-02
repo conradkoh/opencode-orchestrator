@@ -251,17 +251,17 @@ export default defineSchema({
    * Worker registrations for individual assistant instances.
    * Each worker requires explicit user approval before it can start.
    * Workers are tied to a specific machine and have their own authentication token.
+   *
+   * Status dimensions:
+   * - approvalStatus: Authorization state (pending/approved/revoked) - persistent
+   * - status: Operational state (offline/online) - transient
    */
   workers: defineTable({
     workerId: v.string(), // Client-generated nanoid
     machineId: v.string(), // Reference to parent machine
     name: v.optional(v.string()), // Optional user-friendly name
-    status: v.union(
-      v.literal('pending_authorization'),
-      v.literal('ready'),
-      v.literal('online'),
-      v.literal('offline')
-    ),
+    approvalStatus: v.union(v.literal('pending'), v.literal('approved'), v.literal('revoked')),
+    status: v.union(v.literal('offline'), v.literal('online')),
     createdAt: v.number(), // When worker was created
     approvedAt: v.optional(v.number()), // When worker was approved
     approvedBy: v.optional(v.id('users')), // User who approved
@@ -270,8 +270,9 @@ export default defineSchema({
     .index('by_worker_id', ['workerId'])
     .index('by_machine_id', ['machineId'])
     .index('by_machine_and_worker', ['machineId', 'workerId'])
+    .index('by_approval_status', ['approvalStatus'])
     .index('by_status', ['status'])
-    .index('by_machine_and_status', ['machineId', 'status']),
+    .index('by_machine_and_approval_status', ['machineId', 'approvalStatus']),
 
   /**
    * Chat sessions for worker conversations.

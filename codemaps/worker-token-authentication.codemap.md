@@ -11,9 +11,12 @@ This flow replaces the machine token authentication with individual worker token
 Key features:
 - Generate unique worker tokens in format `machine_<machine_id>:worker_<worker_id>`
 - Worker registration requires user approval
-- Workers enter `pending_authorization` state until approved
+- Workers have two independent status dimensions:
+  - **Approval Status**: `pending`, `approved`, `revoked` (authorization dimension)
+  - **Operational Status**: `offline`, `online` (runtime dimension)
 - User can view and approve pending worker requests
-- Approved workers transition to `ready` state
+- Once approved, workers remain approved across restarts
+- Operational status changes independently (offline ↔ online)
 - Machine compromise only affects that specific worker, not the entire cluster
 
 ## Sequence Diagram
@@ -38,7 +41,7 @@ Dialog -> Hook: createWorker(machineId: string, name?: string): Promise<WorkerRe
 Hook -> Hook: Generate workerId using nanoid
 Hook -> CreateMutation: { machineId, workerId, name }
 CreateMutation -> Backend: Validate machine exists
-Backend -> WorkersDB: Insert { machineId, workerId, name, status: 'pending_authorization' }
+Backend -> WorkersDB: Insert { machineId, workerId, name, approvalStatus: 'pending', status: 'offline' }
 WorkersDB --> Backend: Record created
 Backend --> CreateMutation: { workerId, token: `machine_${machineId}:worker_${workerId}` }
 CreateMutation --> Hook: WorkerRegistration
@@ -55,13 +58,13 @@ CLI -> RegisterMutation: { machineId, workerId }
 RegisterMutation -> Backend: Find worker by machineId + workerId
 Backend -> WorkersDB: Query worker record
 WorkersDB --> Backend: Worker found
-Backend -> Backend: Check approval status
+Backend -> Backend: Check approvalStatus
 alt Already Approved
-  Backend -> WorkersDB: Update status to 'ready'
-  Backend --> RegisterMutation: { status: 'ready', approved: true }
+  Backend -> WorkersDB: Update status to 'online', lastHeartbeat
+  Backend --> RegisterMutation: { approvalStatus: 'approved', status: 'online', approved: true }
   RegisterMutation --> CLI: Worker starts normally
 else Not Approved
-  Backend --> RegisterMutation: { status: 'pending_authorization', approved: false }
+  Backend --> RegisterMutation: { approvalStatus: 'pending', status: 'offline', approved: false }
   RegisterMutation --> CLI: Worker enters pending state
   CLI -> CLI: Poll for approval status
 end
@@ -72,18 +75,18 @@ participant "api.workers.approve" as ApproveMutation
 
 User -> PendingUI: Navigate to pending workers list
 PendingUI -> Backend: Subscribe to api.workers.listPending
-Backend -> WorkersDB: Query workers with status='pending_authorization'
+Backend -> WorkersDB: Query workers with approvalStatus='pending'
 WorkersDB --> Backend: Array<PendingWorker>
 Backend --> PendingUI: Display pending workers
 User -> PendingUI: Click "Approve" button
 PendingUI -> ApproveMutation: { workerId }
-ApproveMutation -> Backend: Update worker status
-Backend -> WorkersDB: Update { status: 'ready', approvedAt: now }
+ApproveMutation -> Backend: Update worker approvalStatus
+Backend -> WorkersDB: Update { approvalStatus: 'approved', approvedAt: now }
 WorkersDB --> Backend: Updated
 Backend --> ApproveMutation: Success
 ApproveMutation --> PendingUI: Refresh list
 Backend --> CLI: Notify via subscription
-CLI -> CLI: Transition to ready state
+CLI -> CLI: Connect and transition to online
 CLI -> User: Worker is now active
 
 @enduml
@@ -203,7 +206,8 @@ CLI -> User: Worker is now active
     workerId: string;
     machineId: string;
     name?: string;
-    status: 'pending_authorization';
+    approvalStatus: 'pending';
+    status: 'offline';
     createdAt: number;
   }
 
@@ -239,7 +243,8 @@ CLI -> User: Worker is now active
     workerId: string;
     machineId: string;
     name?: string;
-    status: 'pending_authorization' | 'ready' | 'online' | 'offline';
+    approvalStatus: 'pending' | 'approved' | 'revoked';
+    status: 'offline' | 'online';
     createdAt: number;
     approvedAt?: number;
     lastHeartbeat?: number;
@@ -271,7 +276,8 @@ CLI -> User: Worker is now active
     workerId: string;
     machineId: string;
     name?: string;
-    status: 'pending_authorization' | 'ready' | 'online' | 'offline';
+    approvalStatus: 'pending' | 'approved' | 'revoked';
+    status: 'offline' | 'online';
     createdAt: number;
     approvedAt?: number;
     lastHeartbeat?: number;
@@ -281,7 +287,8 @@ CLI -> User: Worker is now active
     workerId: string;
     machineId: string;
     name?: string;
-    status: 'pending_authorization';
+    approvalStatus: 'pending';
+    status: 'offline';
     createdAt: number;
   }
   ```
@@ -298,16 +305,23 @@ CLI -> User: Worker is now active
      * Worker registrations for individual assistant instances.
      * Each worker requires explicit user approval before it can start.
      * Workers are tied to a specific machine.
+     * 
+     * Status dimensions:
+     * - approvalStatus: Authorization state (pending/approved/revoked)
+     * - status: Operational state (offline/online)
      */
     workers: defineTable({
       workerId: v.string(),           // Client-generated nanoid
       machineId: v.string(),          // Reference to parent machine
       name: v.optional(v.string()),   // Optional user-friendly name
+      approvalStatus: v.union(
+        v.literal('pending'),
+        v.literal('approved'),
+        v.literal('revoked')
+      ),
       status: v.union(
-        v.literal('pending_authorization'),
-        v.literal('ready'),
-        v.literal('online'),
-        v.literal('offline')
+        v.literal('offline'),
+        v.literal('online')
       ),
       createdAt: v.number(),          // When worker was created
       approvedAt: v.optional(v.number()), // When worker was approved
@@ -317,8 +331,9 @@ CLI -> User: Worker is now active
       .index('by_worker_id', ['workerId'])
       .index('by_machine_id', ['machineId'])
       .index('by_machine_and_worker', ['machineId', 'workerId'])
+      .index('by_approval_status', ['approvalStatus'])
       .index('by_status', ['status'])
-      .index('by_machine_and_status', ['machineId', 'status']),
+      .index('by_machine_and_approval_status', ['machineId', 'approvalStatus']),
   });
   ```
 
@@ -375,12 +390,13 @@ CLI -> User: Worker is now active
         throw new Error('Worker ID already exists. Please try again.');
       }
 
-      // Create worker record with pending status
+      // Create worker record with pending approval status
       await ctx.db.insert('workers', {
         workerId: args.workerId,
         machineId: args.machineId,
         name: args.name,
-        status: 'pending_authorization',
+        approvalStatus: 'pending',
+        status: 'offline',
         createdAt: Date.now(),
       });
 
@@ -414,8 +430,8 @@ CLI -> User: Worker is now active
         throw new Error('Worker not found. Please check your worker token.');
       }
 
-      // Check if already approved
-      if (worker.status === 'ready' || worker.status === 'online') {
+      // Check if already approved (approval status is independent of operational status)
+      if (worker.approvalStatus === 'approved') {
         // Update to online
         await ctx.db.patch(worker._id, {
           status: 'online',
@@ -423,7 +439,8 @@ CLI -> User: Worker is now active
         });
 
         return {
-          status: 'ready',
+          approvalStatus: 'approved',
+          status: 'online',
           approved: true,
           workerId: worker.workerId,
           name: worker.name,
@@ -432,7 +449,8 @@ CLI -> User: Worker is now active
 
       // Still pending authorization
       return {
-        status: 'pending_authorization',
+        approvalStatus: 'pending',
+        status: 'offline',
         approved: false,
         workerId: worker.workerId,
         name: worker.name,
@@ -476,9 +494,9 @@ CLI -> User: Worker is now active
         throw new Error('Unauthorized: You do not own this machine');
       }
 
-      // Update worker status to ready
+      // Update worker approval status to approved
       await ctx.db.patch(worker._id, {
-        status: 'ready',
+        approvalStatus: 'approved',
         approvedAt: Date.now(),
         approvedBy: user._id,
       });
@@ -522,6 +540,7 @@ CLI -> User: Worker is now active
         workerId: worker.workerId,
         machineId: worker.machineId,
         name: worker.name,
+        approvalStatus: worker.approvalStatus,
         status: worker.status,
         createdAt: worker.createdAt,
         approvedAt: worker.approvedAt,
@@ -558,8 +577,8 @@ CLI -> User: Worker is now active
       // Get pending workers for this machine
       const workers = await ctx.db
         .query('workers')
-        .withIndex('by_machine_and_status', (q) => 
-          q.eq('machineId', args.machineId).eq('status', 'pending_authorization')
+        .withIndex('by_machine_and_approval_status', (q) => 
+          q.eq('machineId', args.machineId).eq('approvalStatus', 'pending')
         )
         .collect();
 
@@ -567,7 +586,8 @@ CLI -> User: Worker is now active
         workerId: worker.workerId,
         machineId: worker.machineId,
         name: worker.name,
-        status: worker.status as 'pending_authorization',
+        approvalStatus: worker.approvalStatus as 'pending',
+        status: worker.status,
         createdAt: worker.createdAt,
       }));
     },

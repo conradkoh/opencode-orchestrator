@@ -53,12 +53,13 @@ export const create = mutation({
       throw new Error('Worker ID already exists. Please try again.');
     }
 
-    // Create worker record with pending status
+    // Create worker record with pending approval status
     await ctx.db.insert('workers', {
       workerId: args.workerId,
       machineId: args.machineId,
       name: args.name,
-      status: 'pending_authorization',
+      approvalStatus: 'pending',
+      status: 'offline',
       createdAt: Date.now(),
     });
 
@@ -96,8 +97,8 @@ export const register = mutation({
       throw new Error('Worker not found. Please check your worker token.');
     }
 
-    // Check if already approved
-    if (worker.status === 'ready' || worker.status === 'online') {
+    // Check if already approved (approval status is independent of operational status)
+    if (worker.approvalStatus === 'approved') {
       // Update to online
       await ctx.db.patch(worker._id, {
         status: 'online',
@@ -110,7 +111,8 @@ export const register = mutation({
       });
 
       return {
-        status: 'ready' as const,
+        approvalStatus: 'approved' as const,
+        status: 'online' as const,
         approved: true,
         workerId: worker.workerId,
         name: worker.name,
@@ -119,7 +121,8 @@ export const register = mutation({
 
     // Still pending authorization
     return {
-      status: 'pending_authorization' as const,
+      approvalStatus: 'pending' as const,
+      status: 'offline' as const,
       approved: false,
       workerId: worker.workerId,
       name: worker.name,
@@ -165,9 +168,9 @@ export const approve = mutation({
       throw new Error('Unauthorized: You do not own this machine');
     }
 
-    // Update worker status to ready
+    // Update worker approval status to approved
     await ctx.db.patch(worker._id, {
-      status: 'ready',
+      approvalStatus: 'approved',
       approvedAt: Date.now(),
       approvedBy: user._id,
     });
@@ -259,6 +262,7 @@ export const list = query({
       workerId: worker.workerId,
       machineId: worker.machineId,
       name: worker.name,
+      approvalStatus: worker.approvalStatus,
       status: worker.status,
       createdAt: worker.createdAt,
       approvedAt: worker.approvedAt,
@@ -298,8 +302,8 @@ export const listPending = query({
     // Get pending workers for this machine
     const workers = await ctx.db
       .query('workers')
-      .withIndex('by_machine_and_status', (q) =>
-        q.eq('machineId', args.machineId).eq('status', 'pending_authorization')
+      .withIndex('by_machine_and_approval_status', (q) =>
+        q.eq('machineId', args.machineId).eq('approvalStatus', 'pending')
       )
       .collect();
 
@@ -307,7 +311,8 @@ export const listPending = query({
       workerId: worker.workerId,
       machineId: worker.machineId,
       name: worker.name,
-      status: worker.status as 'pending_authorization',
+      approvalStatus: worker.approvalStatus as 'pending',
+      status: worker.status,
       createdAt: worker.createdAt,
     }));
   },
@@ -337,8 +342,8 @@ export const heartbeat = mutation({
       throw new Error('Unauthorized: Worker not found');
     }
 
-    // Only update heartbeat if worker is ready or online
-    if (worker.status === 'ready' || worker.status === 'online') {
+    // Only update heartbeat if worker is approved
+    if (worker.approvalStatus === 'approved') {
       await ctx.db.patch(worker._id, {
         status: 'online',
         lastHeartbeat: Date.now(),

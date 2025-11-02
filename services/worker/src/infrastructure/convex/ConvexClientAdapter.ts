@@ -48,7 +48,8 @@ export class ConvexClientAdapter {
    * @returns Registration result with approval status
    */
   async register(): Promise<{
-    status: 'pending_authorization' | 'ready';
+    approvalStatus: 'pending' | 'approved';
+    status: 'offline' | 'online';
     approved: boolean;
     workerId: string;
     name?: string;
