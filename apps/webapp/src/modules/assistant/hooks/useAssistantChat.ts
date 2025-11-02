@@ -35,7 +35,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   // Queries
   const sessionData = useSessionQuery(
     api.chat.getSession,
-    activeSessionId ? { sessionId: activeSessionId } : 'skip'
+    activeSessionId ? { chatSessionId: activeSessionId } : 'skip'
   );
 
   // Debug: Also fetch all sessions to see if our session exists
@@ -43,7 +43,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
 
   const messagesData = useSessionQuery(
     api.chat.subscribeToMessages,
-    activeSessionId ? { sessionId: activeSessionId } : 'skip'
+    activeSessionId ? { chatSessionId: activeSessionId } : 'skip'
   );
 
   // Convert session data to ChatSession type
@@ -88,7 +88,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   const chunksData = useSessionQuery(
     api.chat.subscribeToChunks,
     streamingMessage && activeSessionId
-      ? { sessionId: activeSessionId, messageId: streamingMessage.id }
+      ? { chatSessionId: activeSessionId, messageId: streamingMessage.id }
       : 'skip'
   );
 
@@ -142,14 +142,17 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     async (sessionId: string): Promise<void> => {
       if (!workerId) throw new Error('No worker selected');
 
+      console.log('[useAssistantChat] Restoring session:', sessionId);
       setIsLoading(true);
       setError(null);
 
       try {
         // Just set the active session ID - queries will load the data
         setActiveSessionId(sessionId);
+        console.log('[useAssistantChat] Active session ID set to:', sessionId);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
+        console.error('[useAssistantChat] Error restoring session:', error);
         setError(error);
         throw error;
       } finally {
@@ -169,7 +172,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     setError(null);
 
     try {
-      await endSessionMutation({ sessionId: activeSessionId });
+      await endSessionMutation({ chatSessionId: activeSessionId });
       setActiveSessionId(null);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -193,7 +196,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
 
       try {
         // Send message - backend will create user message and assistant placeholder
-        await sendMessageMutation({ sessionId: activeSessionId, content });
+        await sendMessageMutation({ chatSessionId: activeSessionId, content });
         // Worker will receive notification and start processing
         // Chunks will arrive via subscribeToChunks subscription
       } catch (err) {

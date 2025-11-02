@@ -83,7 +83,7 @@ export const startSession = mutation({
 export const endSession = mutation({
   args: {
     ...SessionIdArg,
-    sessionId: v.string(),
+    chatSessionId: v.string(),
   },
   handler: async (ctx, args) => {
     // Verify user is authenticated
@@ -95,7 +95,7 @@ export const endSession = mutation({
     // Find session
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session) {
@@ -126,7 +126,7 @@ export const endSession = mutation({
 export const sendMessage = mutation({
   args: {
     ...SessionIdArg,
-    sessionId: v.string(),
+    chatSessionId: v.string(),
     content: v.string(),
   },
   handler: async (ctx, args) => {
@@ -139,7 +139,7 @@ export const sendMessage = mutation({
     // Find session
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session) {
@@ -162,7 +162,7 @@ export const sendMessage = mutation({
     const userMessageId = nanoid();
     await ctx.db.insert('chatMessages', {
       messageId: userMessageId,
-      sessionId: args.sessionId,
+      sessionId: args.chatSessionId,
       role: 'user',
       content: args.content,
       timestamp,
@@ -173,7 +173,7 @@ export const sendMessage = mutation({
     const assistantMessageId = nanoid();
     await ctx.db.insert('chatMessages', {
       messageId: assistantMessageId,
-      sessionId: args.sessionId,
+      sessionId: args.chatSessionId,
       role: 'assistant',
       content: '', // Will be filled as chunks arrive
       timestamp: timestamp + 1, // Slightly after user message
@@ -200,7 +200,7 @@ export const sendMessage = mutation({
  */
 export const writeChunk = mutation({
   args: {
-    sessionId: v.string(),
+    chatSessionId: v.string(),
     messageId: v.string(),
     chunk: v.string(),
     sequence: v.number(),
@@ -209,7 +209,7 @@ export const writeChunk = mutation({
     // Verify session exists
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session) {
@@ -231,7 +231,7 @@ export const writeChunk = mutation({
     await ctx.db.insert('chatChunks', {
       chunkId,
       messageId: args.messageId,
-      sessionId: args.sessionId,
+      sessionId: args.chatSessionId,
       chunk: args.chunk,
       sequence: args.sequence,
       timestamp: Date.now(),
@@ -254,7 +254,7 @@ export const writeChunk = mutation({
  */
 export const completeMessage = mutation({
   args: {
-    sessionId: v.string(),
+    chatSessionId: v.string(),
     messageId: v.string(),
     content: v.string(),
   },
@@ -262,7 +262,7 @@ export const completeMessage = mutation({
     // Verify session exists
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session) {
@@ -300,13 +300,13 @@ export const completeMessage = mutation({
  */
 export const sessionReady = mutation({
   args: {
-    sessionId: v.string(),
+    chatSessionId: v.string(),
   },
   handler: async (ctx, args) => {
     // Find session
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session) {
@@ -329,10 +329,10 @@ export const sessionReady = mutation({
 export const getSession = query({
   args: {
     ...SessionIdArg,
-    sessionId: v.string(),
+    chatSessionId: v.string(), // Renamed to avoid conflict with auth sessionId
   },
   handler: async (ctx, args) => {
-    console.log('[getSession] Called with sessionId:', args.sessionId);
+    console.log('[getSession] Called with chatSessionId:', args.chatSessionId);
 
     // Verify user is authenticated
     const user = await getAuthUserOptional(ctx, args);
@@ -345,7 +345,7 @@ export const getSession = query({
     // Find session
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     console.log('[getSession] Session found:', session ? 'yes' : 'no');
@@ -438,7 +438,7 @@ export const listSessions = query({
 export const getMessages = query({
   args: {
     ...SessionIdArg,
-    sessionId: v.string(),
+    chatSessionId: v.string(),
   },
   handler: async (ctx, args) => {
     // Verify user is authenticated
@@ -450,7 +450,7 @@ export const getMessages = query({
     // Verify session exists and user owns it
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session || session.userId !== user._id) {
@@ -460,7 +460,7 @@ export const getMessages = query({
     // Get all messages for this session
     const messages = await ctx.db
       .query('chatMessages')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .collect();
 
     // Sort by timestamp
@@ -487,7 +487,7 @@ export const getMessages = query({
 export const subscribeToMessages = query({
   args: {
     ...SessionIdArg,
-    sessionId: v.string(),
+    chatSessionId: v.string(),
   },
   handler: async (ctx, args) => {
     // Verify user is authenticated
@@ -499,7 +499,7 @@ export const subscribeToMessages = query({
     // Verify session exists and user owns it
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session || session.userId !== user._id) {
@@ -509,7 +509,7 @@ export const subscribeToMessages = query({
     // Get all messages for this session
     const messages = await ctx.db
       .query('chatMessages')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .collect();
 
     // Sort by timestamp
@@ -537,7 +537,7 @@ export const subscribeToMessages = query({
 export const subscribeToChunks = query({
   args: {
     ...SessionIdArg,
-    sessionId: v.string(),
+    chatSessionId: v.string(),
     messageId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -550,7 +550,7 @@ export const subscribeToChunks = query({
     // Verify session exists and user owns it
     const session = await ctx.db
       .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
       .first();
 
     if (!session || session.userId !== user._id) {

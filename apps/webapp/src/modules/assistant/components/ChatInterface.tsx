@@ -112,9 +112,11 @@ export function ChatInterface() {
    */
   const handleRestoreSession = useCallback(
     async (sessionId: string) => {
+      console.log('[ChatInterface] Restoring session:', sessionId);
       try {
         await restoreSession(sessionId);
         setShowNewSession(false);
+        console.log('[ChatInterface] Session restored successfully');
       } catch (error) {
         console.error('Failed to restore session:', error);
       }

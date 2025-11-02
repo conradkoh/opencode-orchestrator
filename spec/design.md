@@ -161,6 +161,7 @@ Backend --> Frontend: Complete message available
 Workers have two independent status dimensions:
 
 1. **Approval Status** (authorization dimension):
+
    - `pending` - Waiting for user approval (initial state)
    - `approved` - User has authorized this worker
    - `revoked` - User has revoked authorization
@@ -170,6 +171,7 @@ Workers have two independent status dimensions:
    - `online` - Worker is actively connected
 
 Key behaviors:
+
 - New workers start with `approvalStatus: pending` and `status: offline`
 - Worker polls backend every 5 seconds for approval
 - User approves workers through machine settings UI
