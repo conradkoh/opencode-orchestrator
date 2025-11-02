@@ -23,7 +23,10 @@ export const updateModels = mutation({
   },
   handler: async (ctx, args) => {
     console.log('[updateModels] Updating models for worker:', args.workerId);
-    console.log('[updateModels] Models:', JSON.stringify(args.models, null, 2));
+    console.log(`[updateModels] Received ${args.models.length} models:`);
+    for (const model of args.models) {
+      console.log(`[updateModels]   - ${model.id} (${model.provider}): ${model.name}`);
+    }
 
     // Check if worker exists
     const worker = await ctx.db
@@ -47,7 +50,7 @@ export const updateModels = mutation({
         models: args.models,
         updatedAt: Date.now(),
       });
-      console.log('[updateModels] Updated existing models record');
+      console.log('[updateModels] ✅ Updated existing models record');
     } else {
       // Create new record
       await ctx.db.insert('workerModels', {
@@ -55,10 +58,11 @@ export const updateModels = mutation({
         models: args.models,
         updatedAt: Date.now(),
       });
-      console.log('[updateModels] Created new models record');
+      console.log('[updateModels] ✅ Created new models record');
     }
 
-    return { success: true };
+    console.log('[updateModels] ✅ Models successfully stored in Convex');
+    return { success: true, modelsCount: args.models.length };
   },
 });
 

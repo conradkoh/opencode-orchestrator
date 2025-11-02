@@ -40,11 +40,17 @@ export class ChatSessionManager {
     try {
       console.log('📋 Fetching available models from opencode...');
       const models = await this.opencodeAdapter.listModels(this.opencodeClient);
-      console.log(`✅ Found ${models.length} models:`, models.map((m) => m.id).join(', '));
+
+      // Log detailed model information
+      console.log(`✅ Found ${models.length} models:`);
+      for (const model of models) {
+        console.log(`   - ${model.id} (${model.provider}): ${model.name}`);
+      }
 
       // Publish models to Convex
+      console.log('📤 Publishing models to Convex...');
       await this.convexClient.publishModels(models);
-      console.log('✅ Models published to Convex');
+      console.log('✅ Models published to Convex successfully');
 
       // Mark worker as connected
       await this.convexClient.markConnected();

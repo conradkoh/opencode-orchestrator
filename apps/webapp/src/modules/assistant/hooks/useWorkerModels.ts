@@ -5,6 +5,7 @@
 
 import { api } from '@workspace/backend/convex/_generated/api';
 import { useQuery } from 'convex/react';
+import { useEffect } from 'react';
 import type { WorkerModelsData } from '../types';
 
 /**
@@ -16,6 +17,18 @@ import type { WorkerModelsData } from '../types';
  */
 export function useWorkerModels(workerId: string | null): WorkerModelsData {
   const data = useQuery(api.workerModels.subscribeToModels, workerId ? { workerId } : 'skip');
+
+  // Log when models are received
+  useEffect(() => {
+    if (data?.models) {
+      console.log(
+        `[useWorkerModels] Received ${data.models.length} models for worker ${workerId}:`
+      );
+      for (const model of data.models) {
+        console.log(`[useWorkerModels]   - ${model.id} (${model.provider}): ${model.name}`);
+      }
+    }
+  }, [data?.models, workerId]);
 
   return {
     models: data?.models ?? null,
