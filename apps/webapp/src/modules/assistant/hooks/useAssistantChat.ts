@@ -51,7 +51,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     console.log('[useAssistantChat] Session data:', {
       activeSessionId,
       sessionData,
-      allSessions: allSessions?.map((s) => s.sessionId),
+      allSessions: allSessions?.map((s: { sessionId: string }) => s.sessionId),
       allSessionsCount: allSessions?.length,
     });
     if (!sessionData) return null;
@@ -69,15 +69,24 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   const messages = useMemo<ChatMessage[]>(() => {
     if (!messagesData) return [];
 
-    return messagesData.map((msg) => ({
-      id: msg.id,
-      sessionId: msg.sessionId,
-      role: msg.role,
-      content: msg.content,
-      timestamp: msg.timestamp,
-      completed: msg.completed,
-      isStreaming: !msg.completed && msg.role === 'assistant',
-    }));
+    return messagesData.map(
+      (msg: {
+        id: string;
+        sessionId: string;
+        role: 'user' | 'assistant' | 'system';
+        content: string;
+        timestamp: number;
+        completed: boolean;
+      }) => ({
+        id: msg.id,
+        sessionId: msg.sessionId,
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        completed: msg.completed,
+        isStreaming: !msg.completed && msg.role === 'assistant',
+      })
+    );
   }, [messagesData]);
 
   // Subscribe to chunks for streaming messages
@@ -99,7 +108,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     }
 
     // Assemble chunks into content
-    const chunkContent = chunksData.map((c) => c.chunk).join('');
+    const chunkContent = chunksData.map((c: { chunk: string }) => c.chunk).join('');
 
     return messages.map((msg) =>
       msg.id === streamingMessage.id ? { ...msg, content: chunkContent } : msg

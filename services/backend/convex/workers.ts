@@ -20,7 +20,7 @@ export const create = mutation({
     workerId: v.string(),
     name: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ workerId: string; token: string }> => {
     // Verify user is authenticated
     const user = await getAuthUserOptional(ctx, args);
     if (!user) {
@@ -54,7 +54,7 @@ export const create = mutation({
     }
 
     // Generate cryptographic secret
-    const secret = await ctx.scheduler.runAfter(0, internal.workerActions.generateSecret);
+    const secret: string = await ctx.scheduler.runAfter(0, internal.workerActions.generateSecret);
 
     // Create worker record with pending approval status and secret
     await ctx.db.insert('workers', {

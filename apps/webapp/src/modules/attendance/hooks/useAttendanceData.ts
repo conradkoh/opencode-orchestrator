@@ -192,11 +192,12 @@ export const useAttendanceData = ({
 
   // Calculate attendance counts
   const attendingCount = useMemo(() => {
-    return attendanceRecords.filter((r) => r.status === 'attending').length;
+    return attendanceRecords.filter((r: { status?: string }) => r.status === 'attending').length;
   }, [attendanceRecords]);
 
   const notAttendingCount = useMemo(() => {
-    return attendanceRecords.filter((r) => r.status === 'not_attending').length;
+    return attendanceRecords.filter((r: { status?: string }) => r.status === 'not_attending')
+      .length;
   }, [attendanceRecords]);
 
   const pendingCount = useMemo(() => pendingNames.length, [pendingNames.length]);

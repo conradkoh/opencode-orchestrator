@@ -18,7 +18,7 @@ import type { MachinesData } from '../types';
  * ```
  */
 export function useMachines(): MachinesData {
-  const machines = useSessionQuery(api.machines.list) ?? undefined;
+  const machines = useSessionQuery(api.machines.list, {}) ?? undefined;
   const loading = machines === undefined;
 
   return {

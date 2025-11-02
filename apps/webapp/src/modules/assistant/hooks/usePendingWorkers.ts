@@ -19,8 +19,15 @@ import type { PendingWorkersData } from '../types';
  * ```
  */
 export function usePendingWorkers(machineId: string): PendingWorkersData {
-  const workers = useSessionQuery(api.workers.listPending, { machineId }) ?? undefined;
-  const loading = workers === undefined;
+  const workersData = useSessionQuery(api.workers.listPending, { machineId });
+  const loading = workersData === undefined;
+
+  // Map the data to match PendingWorker type (status should always be 'offline' for pending workers)
+  const workers =
+    workersData?.map((w) => ({
+      ...w,
+      status: 'offline' as const,
+    })) ?? undefined;
 
   return {
     workers,

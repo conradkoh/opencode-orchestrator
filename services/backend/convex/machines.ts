@@ -160,11 +160,9 @@ export const list = query({
           .collect();
 
         // Count workers by status
-        const onlineCount = workers.filter(
-          (w) => w.status === 'online' || w.status === 'ready'
-        ).length;
+        const onlineCount = workers.filter((w) => w.status === 'online').length;
         const offlineCount = workers.filter((w) => w.status === 'offline').length;
-        const pendingCount = workers.filter((w) => w.status === 'pending_authorization').length;
+        const pendingCount = workers.filter((w) => w.approvalStatus === 'pending').length;
 
         return {
           machineId: machine.machineId,

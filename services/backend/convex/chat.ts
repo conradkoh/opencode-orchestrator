@@ -39,7 +39,7 @@ export const startSession = mutation({
     }
     console.log('[startSession] Worker found:', worker.workerId, 'status:', worker.status);
 
-    if (worker.status !== 'online' && worker.status !== 'ready') {
+    if (worker.status !== 'online') {
       throw new Error('Worker is not online');
     }
 
