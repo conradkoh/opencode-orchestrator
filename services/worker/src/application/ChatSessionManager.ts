@@ -1,4 +1,6 @@
+import type { IOpencodeInstance } from '../domain/interfaces/IOpencodeClient';
 import type { ConvexClientAdapter } from '../infrastructure/convex/ConvexClientAdapter';
+import { OpencodeClientAdapter } from '../infrastructure/opencode/OpencodeClientAdapter';
 
 /**
  * Manages chat session lifecycle and opencode process management.
@@ -6,30 +8,59 @@ import type { ConvexClientAdapter } from '../infrastructure/convex/ConvexClientA
  */
 export class ChatSessionManager {
   private convexClient: ConvexClientAdapter;
+  private opencodeAdapter: OpencodeClientAdapter;
+  private opencodeClient: IOpencodeInstance | null = null;
   private activeSessions: Map<string, SessionInfo> = new Map();
+  private workingDirectory: string;
 
-  constructor(convexClient: ConvexClientAdapter) {
+  constructor(convexClient: ConvexClientAdapter, workingDirectory: string) {
     this.convexClient = convexClient;
+    this.opencodeAdapter = new OpencodeClientAdapter();
+    this.workingDirectory = workingDirectory;
   }
 
   /**
-   * Start a new chat session.
-   * For now, we'll just log and mark as ready.
-   * TODO: Spawn actual opencode process
+   * Initialize opencode client if not already initialized.
+   */
+  private async ensureOpencodeClient(): Promise<void> {
+    if (!this.opencodeClient) {
+      console.log(`🔧 Initializing opencode client for directory: ${this.workingDirectory}`);
+      this.opencodeClient = await this.opencodeAdapter.createClient(this.workingDirectory);
+      console.log('✅ Opencode client initialized');
+    }
+  }
+
+  /**
+   * Start a new chat session with opencode.
    */
   async startSession(sessionId: string, model: string): Promise<void> {
     console.log(`🚀 Starting session ${sessionId} with model ${model}`);
 
-    // Store session info
-    this.activeSessions.set(sessionId, {
-      sessionId,
-      model,
-      startedAt: Date.now(),
-    });
+    try {
+      // Ensure opencode client is initialized
+      await this.ensureOpencodeClient();
 
-    // Mark session as ready
-    await this.convexClient.sessionReady(sessionId);
-    console.log(`✅ Session ${sessionId} ready`);
+      // Create opencode session
+      // Note: We use the Convex sessionId as the opencode session ID
+      // This allows us to resume sessions later
+      const opencodeSession = await this.opencodeAdapter.createSession(this.opencodeClient!, model);
+      console.log(`📝 Opencode session created: ${opencodeSession.id}`);
+
+      // Store session info
+      this.activeSessions.set(sessionId, {
+        sessionId,
+        model,
+        startedAt: Date.now(),
+        opencodeSessionId: opencodeSession.id,
+      });
+
+      // Mark session as ready
+      await this.convexClient.sessionReady(sessionId);
+      console.log(`✅ Session ${sessionId} ready`);
+    } catch (error) {
+      console.error(`❌ Failed to start session ${sessionId}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -42,9 +73,7 @@ export class ChatSessionManager {
   }
 
   /**
-   * Process a message in a session.
-   * For now, we'll just echo back a mock response.
-   * TODO: Route to actual opencode process
+   * Process a message in a session using opencode.
    */
   async processMessage(sessionId: string, messageId: string, content: string): Promise<void> {
     console.log(`📨 Processing message in session ${sessionId}:`, content);
@@ -55,20 +84,42 @@ export class ChatSessionManager {
       return;
     }
 
-    // Mock response - simulate streaming
-    const mockResponse = `Echo: ${content}\n\nThis is a mock response from the worker. The opencode integration will be implemented next.`;
-
-    // Stream the response in chunks
-    const chunks = mockResponse.match(/.{1,20}/g) || [mockResponse];
-    for (let i = 0; i < chunks.length; i++) {
-      await this.convexClient.writeChunk(sessionId, messageId, chunks[i], i);
-      // Small delay to simulate streaming
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    if (!session.opencodeSessionId) {
+      console.error(`❌ No opencode session ID for ${sessionId}`);
+      return;
     }
 
-    // Complete the message
-    await this.convexClient.completeMessage(sessionId, messageId, mockResponse);
-    console.log(`✅ Message ${messageId} completed`);
+    try {
+      await this.ensureOpencodeClient();
+
+      // Send prompt to opencode and stream response
+      const responseIterator = this.opencodeAdapter.sendPrompt(
+        this.opencodeClient!,
+        session.opencodeSessionId as any,
+        content,
+        session.model
+      );
+
+      let fullResponse = '';
+      let sequence = 0;
+
+      // Stream chunks as they arrive from opencode
+      for await (const chunk of responseIterator) {
+        fullResponse += chunk;
+        await this.convexClient.writeChunk(sessionId, messageId, chunk, sequence++);
+        console.log(`📤 Chunk ${sequence} sent (${chunk.length} chars)`);
+      }
+
+      // Complete the message with full content
+      await this.convexClient.completeMessage(sessionId, messageId, fullResponse);
+      console.log(`✅ Message ${messageId} completed (${fullResponse.length} chars total)`);
+    } catch (error) {
+      console.error(`❌ Failed to process message ${messageId}:`, error);
+      // Write error message to chat
+      const errorMessage = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      await this.convexClient.writeChunk(sessionId, messageId, errorMessage, 0);
+      await this.convexClient.completeMessage(sessionId, messageId, errorMessage);
+    }
   }
 
   /**
@@ -83,4 +134,5 @@ interface SessionInfo {
   sessionId: string;
   model: string;
   startedAt: number;
+  opencodeSessionId?: string;
 }

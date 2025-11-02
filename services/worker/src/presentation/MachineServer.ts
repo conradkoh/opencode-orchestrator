@@ -86,7 +86,10 @@ export class MachineServer {
 
     // Initialize chat session manager
     console.log('💬 Initializing chat session manager...');
-    this._chatManager = new ChatSessionManager(this._convexClient);
+    // Use current working directory as the workspace for opencode
+    const workingDirectory = process.cwd();
+    console.log(`📂 Working directory: ${workingDirectory}`);
+    this._chatManager = new ChatSessionManager(this._convexClient, workingDirectory);
 
     // Set up chat event callbacks
     this._convexClient.onSessionStart(async (sessionId, model) => {
