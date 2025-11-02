@@ -6,6 +6,10 @@ import type {
 import type { SessionId } from '@domain/valueObjects/Ids';
 import type { OpencodeClient } from '@opencode-ai/sdk';
 import { createOpencode } from '@opencode-ai/sdk';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * Internal wrapper for OpenCode SDK client and server.
@@ -117,9 +121,10 @@ export class OpencodeClientAdapter implements IOpencodeClient {
   }
 
   /**
-   * Lists all available AI models from the OpenCode server.
+   * Lists all available AI models using the opencode CLI.
+   * Uses `opencode models` command to get the complete list of available models.
    *
-   * @param client - OpenCode client instance
+   * @param client - OpenCode client instance (unused, but kept for interface compatibility)
    * @returns Array of available models with their metadata
    * @throws Error if listing fails
    */
@@ -127,22 +132,38 @@ export class OpencodeClientAdapter implements IOpencodeClient {
     client: IOpencodeInstance
   ): Promise<Array<{ id: string; name: string; provider: string }>> {
     try {
-      const instance = client as OpencodeInstanceInternal;
-      const sdkClient = instance._internal.client;
+      console.log('[OpencodeClientAdapter] Fetching models using CLI: opencode models');
 
-      // SDK: client.model.list()
-      const result = await sdkClient.model.list();
+      // Run the opencode models CLI command
+      const { stdout } = await execAsync('opencode models');
 
-      if (!result.data || !Array.isArray(result.data)) {
-        throw new Error('Invalid response from OpenCode models API');
+      // Parse the output - each line is a model in format "provider/model-id"
+      const lines = stdout.split('\n').filter((line) => line.trim());
+      const models: Array<{ id: string; name: string; provider: string }> = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        // Each model should be in format "provider/model-id"
+        if (trimmed.includes('/')) {
+          const [provider, ...modelParts] = trimmed.split('/');
+          const modelId = modelParts.join('/');
+          if (provider && modelId) {
+            models.push({
+              id: trimmed,
+              name: modelId, // Use model ID as display name
+              provider: provider.trim(),
+            });
+          }
+        }
       }
 
-      // Transform SDK model format to our format
-      return result.data.map((model: any) => ({
-        id: `${model.providerID}/${model.modelID}`,
-        name: model.name || model.modelID,
-        provider: model.providerID,
-      }));
+      console.log(`[OpencodeClientAdapter] Found ${models.length} models from CLI`);
+
+      if (models.length === 0) {
+        console.warn('[OpencodeClientAdapter] No models found from opencode CLI');
+      }
+
+      return models;
     } catch (error) {
       throw new Error(
         `Failed to list models: ${error instanceof Error ? error.message : String(error)}`

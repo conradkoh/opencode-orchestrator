@@ -27,16 +27,17 @@ export class ChatSessionManager {
    * @returns Promise that resolves when connection is complete
    */
   async connect(): Promise<void> {
-    if (this.opencodeClient) {
-      console.log('✅ Opencode client already connected');
-      return;
+    // Initialize opencode client if not already done
+    if (!this.opencodeClient) {
+      console.log(`🔧 Connecting opencode client for directory: ${this.workingDirectory}`);
+      this.opencodeClient = await this.opencodeAdapter.createClient(this.workingDirectory);
+      console.log('✅ Opencode client initialized');
+    } else {
+      console.log('✅ Opencode client already connected, fetching models...');
     }
 
-    console.log(`🔧 Connecting opencode client for directory: ${this.workingDirectory}`);
-    this.opencodeClient = await this.opencodeAdapter.createClient(this.workingDirectory);
-    console.log('✅ Opencode client initialized');
-
-    // Fetch and publish available models
+    // Always fetch and publish models when connect() is called
+    // This ensures models are updated even if client was already connected
     try {
       console.log('📋 Fetching available models from opencode...');
       const models = await this.opencodeAdapter.listModels(this.opencodeClient);
