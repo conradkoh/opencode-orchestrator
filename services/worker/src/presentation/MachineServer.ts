@@ -91,7 +91,17 @@ export class MachineServer {
     console.log(`📂 Working directory: ${workingDirectory}`);
     this._chatManager = new ChatSessionManager(this._convexClient, workingDirectory);
 
-    // Set up chat event callbacks
+    // Connect opencode client immediately on startup
+    console.log('🔌 Connecting opencode client...');
+    try {
+      await this._chatManager.connect();
+      console.log('✅ Opencode client connected and models published');
+    } catch (error) {
+      console.error('❌ Failed to connect opencode client:', error);
+      throw error;
+    }
+
+    // Set up event callbacks
     this._convexClient.onSessionStart(async (sessionId, model) => {
       console.log(`📞 Session start callback: ${sessionId}`);
       await this._chatManager?.startSession(sessionId, model);

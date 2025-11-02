@@ -443,3 +443,48 @@ export const remove = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Signal that a worker should connect and initialize opencode.
+ * Called from frontend when user selects a worker.
+ * Sets a flag that the worker subscription will pick up.
+ *
+ * @param workerId - Worker ID to connect
+ * @returns Success status
+ */
+export const requestConnect = mutation({
+  args: {
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    console.log('[workers.requestConnect] Connect request for worker:', args.workerId);
+
+    // Verify worker exists
+    const worker = await ctx.db
+      .query('workers')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .first();
+
+    if (!worker) {
+      throw new Error('Worker not found');
+    }
+
+    // Verify worker is approved and online
+    if (worker.approvalStatus !== 'approved') {
+      throw new Error('Worker is not approved');
+    }
+
+    if (worker.status !== 'online') {
+      throw new Error('Worker is not online');
+    }
+
+    // Update worker with connect request timestamp
+    // Worker will see this and initialize opencode
+    await ctx.db.patch(worker._id, {
+      lastHeartbeat: Date.now(), // Trigger subscription update
+    });
+
+    console.log('[workers.requestConnect] Connect request sent');
+    return { success: true, workerId: args.workerId };
+  },
+});

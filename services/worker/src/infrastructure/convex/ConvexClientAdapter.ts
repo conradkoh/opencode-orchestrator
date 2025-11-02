@@ -3,6 +3,11 @@ import { ConvexClient, ConvexHttpClient } from 'convex/browser';
 import type { WorkerConfig } from '../../config';
 
 /**
+ * Callback for worker connect requests.
+ */
+export type ConnectCallback = () => Promise<void>;
+
+/**
  * Callback for new chat sessions.
  */
 export type SessionStartCallback = (sessionId: string, model: string) => Promise<void>;
@@ -27,7 +32,8 @@ export class ConvexClientAdapter {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 
-  // Chat callbacks
+  // Callbacks
+  private connectCallback: ConnectCallback | null = null;
   private sessionStartCallback: SessionStartCallback | null = null;
   private messageCallback: MessageCallback | null = null;
 
@@ -152,6 +158,13 @@ export class ConvexClientAdapter {
 
     // Close realtime client
     this.realtimeClient.close();
+  }
+
+  /**
+   * Set callback for connect requests.
+   */
+  onConnect(callback: ConnectCallback): void {
+    this.connectCallback = callback;
   }
 
   /**
@@ -379,5 +392,18 @@ export class ConvexClientAdapter {
       workerId: this.config.workerId,
       models,
     });
+  }
+
+  /**
+   * Handle connect request from frontend.
+   * Triggers the connect callback to initialize opencode client.
+   */
+  async handleConnect(): Promise<void> {
+    console.log('🔌 Handling connect request...');
+    if (this.connectCallback) {
+      await this.connectCallback();
+    } else {
+      console.warn('⚠️  No connect callback registered');
+    }
   }
 }
