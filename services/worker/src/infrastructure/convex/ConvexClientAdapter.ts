@@ -180,8 +180,9 @@ export class ConvexClientAdapter {
     // Track which messages we've processed
     const processedMessages = new Set<string>();
 
-    // Track initialization state
-    let isInitialLoad = true;
+    // Track initialization state - separate for each subscription
+    let sessionsInitialized = false;
+    let messagesInitialized = false;
 
     // Subscribe to sessions for this worker
     this.realtimeClient.onUpdate(
@@ -191,11 +192,12 @@ export class ConvexClientAdapter {
         if (!sessions) return;
 
         // On first load, mark all existing sessions as seen (don't trigger callbacks)
-        if (isInitialLoad) {
+        if (!sessionsInitialized) {
           for (const session of sessions) {
             seenSessions.add(session.sessionId);
           }
           console.log(`📋 Marked ${seenSessions.size} existing sessions as seen`);
+          sessionsInitialized = true;
           return;
         }
 
@@ -225,7 +227,7 @@ export class ConvexClientAdapter {
 
         // On first load, mark all existing messages as processed
         // EXCEPT incomplete assistant messages (these need processing)
-        if (isInitialLoad) {
+        if (!messagesInitialized) {
           for (const message of messages) {
             const messageKey = `${message.sessionId}:${message.messageId}`;
 
@@ -278,7 +280,7 @@ export class ConvexClientAdapter {
             }
           }
 
-          isInitialLoad = false;
+          messagesInitialized = true;
           return;
         }
 
