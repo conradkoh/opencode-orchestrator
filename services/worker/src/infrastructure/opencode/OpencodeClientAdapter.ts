@@ -124,12 +124,12 @@ export class OpencodeClientAdapter implements IOpencodeClient {
    * Lists all available AI models using the opencode CLI.
    * Uses `opencode models` command to get the complete list of available models.
    *
-   * @param client - OpenCode client instance (unused, but kept for interface compatibility)
+   * @param _client - OpenCode client instance (unused, but kept for interface compatibility)
    * @returns Array of available models with their metadata
    * @throws Error if listing fails
    */
   async listModels(
-    client: IOpencodeInstance
+    _client: IOpencodeInstance
   ): Promise<Array<{ id: string; name: string; provider: string }>> {
     try {
       console.log('[OpencodeClientAdapter] Fetching models using CLI: opencode models');

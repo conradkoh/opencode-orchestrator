@@ -106,7 +106,7 @@ export class ConvexClientAdapter {
    * Start periodic heartbeat to maintain online status.
    * Heartbeat runs every 30 seconds.
    */
-  private startHeartbeat(): void {
+  startHeartbeat(): void {
     if (this.heartbeatInterval) {
       return; // Already running
     }
@@ -187,7 +187,7 @@ export class ConvexClientAdapter {
   /**
    * Start subscription to worker record for connect requests.
    */
-  private startWorkerSubscription(): void {
+  startWorkerSubscription(): void {
     console.log('📡 Starting worker subscription...');
 
     let lastConnectRequest: number | undefined;
@@ -225,7 +225,7 @@ export class ConvexClientAdapter {
    * Start subscriptions for chat sessions and messages.
    * Listens for new sessions and messages for this worker.
    */
-  private startChatSubscriptions(): void {
+  startChatSubscriptions(): void {
     console.log('📡 Starting chat subscriptions...');
 
     // Start worker subscription for connect requests
