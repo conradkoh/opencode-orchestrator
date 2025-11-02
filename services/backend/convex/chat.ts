@@ -576,3 +576,78 @@ export const subscribeToChunks = query({
     }));
   },
 });
+
+/**
+ * Subscribe to sessions for a worker (for worker service).
+ * Returns all sessions for this worker, updates in real-time.
+ * Used by worker to detect new sessions.
+ *
+ * @param workerId - Worker ID to get sessions for
+ * @returns Array of sessions
+ */
+export const subscribeToWorkerSessions = query({
+  args: {
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get all sessions for this worker
+    const sessions = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .collect();
+
+    return sessions.map((session) => ({
+      sessionId: session.sessionId,
+      workerId: session.workerId,
+      model: session.model,
+      status: session.status,
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+    }));
+  },
+});
+
+/**
+ * Subscribe to messages for a worker (for worker service).
+ * Returns all messages for sessions belonging to this worker.
+ * Used by worker to detect new messages to process.
+ *
+ * @param workerId - Worker ID to get messages for
+ * @returns Array of messages
+ */
+export const subscribeToWorkerMessages = query({
+  args: {
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get all sessions for this worker
+    const sessions = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .collect();
+
+    const sessionIds = sessions.map((s) => s.sessionId);
+
+    // Get all messages for these sessions
+    const allMessages = await Promise.all(
+      sessionIds.map((sessionId) =>
+        ctx.db
+          .query('chatMessages')
+          .withIndex('by_session_id', (q) => q.eq('sessionId', sessionId))
+          .collect()
+      )
+    );
+
+    // Flatten and sort by timestamp
+    const messages = allMessages.flat().sort((a, b) => a.timestamp - b.timestamp);
+
+    return messages.map((message) => ({
+      messageId: message.messageId,
+      sessionId: message.sessionId,
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp,
+      completed: message.completed,
+    }));
+  },
+});

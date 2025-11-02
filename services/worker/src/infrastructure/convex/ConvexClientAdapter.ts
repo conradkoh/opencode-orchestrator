@@ -173,11 +173,71 @@ export class ConvexClientAdapter {
    * Listens for new sessions and messages for this worker.
    */
   private startChatSubscriptions(): void {
+    console.log('📡 Starting chat subscriptions...');
+
+    // Track which sessions we've seen
+    const seenSessions = new Set<string>();
+    // Track which messages we've processed
+    const processedMessages = new Set<string>();
+
     // Subscribe to sessions for this worker
-    // Note: We need a backend query that filters sessions by worker
-    // For now, we'll poll for new sessions
-    // TODO: Implement proper subscription when backend supports it
-    console.log('📡 Chat subscriptions started');
+    this.realtimeClient.onUpdate(
+      api.chat.subscribeToWorkerSessions,
+      { workerId: this.config.workerId },
+      (sessions) => {
+        if (!sessions) return;
+
+        // Check for new sessions
+        for (const session of sessions) {
+          if (!seenSessions.has(session.sessionId) && session.status === 'active') {
+            seenSessions.add(session.sessionId);
+            console.log('🆕 New session detected:', session.sessionId, 'model:', session.model);
+
+            // Notify callback
+            if (this.sessionStartCallback) {
+              this.sessionStartCallback(session.sessionId, session.model).catch((error) => {
+                console.error('❌ Error in session start callback:', error);
+              });
+            }
+          }
+        }
+      }
+    );
+
+    // Subscribe to messages for this worker
+    this.realtimeClient.onUpdate(
+      api.chat.subscribeToWorkerMessages,
+      { workerId: this.config.workerId },
+      (messages) => {
+        if (!messages) return;
+
+        // Check for new user messages that need processing
+        for (const message of messages) {
+          const messageKey = `${message.sessionId}:${message.messageId}`;
+
+          if (!processedMessages.has(messageKey) && message.role === 'user' && message.completed) {
+            processedMessages.add(messageKey);
+            console.log(
+              '📨 New message detected:',
+              message.messageId,
+              'in session:',
+              message.sessionId
+            );
+
+            // Notify callback
+            if (this.messageCallback) {
+              this.messageCallback(message.sessionId, message.messageId, message.content).catch(
+                (error) => {
+                  console.error('❌ Error in message callback:', error);
+                }
+              );
+            }
+          }
+        }
+      }
+    );
+
+    console.log('✅ Chat subscriptions active');
   }
 
   /**
@@ -190,7 +250,7 @@ export class ConvexClientAdapter {
     sequence: number
   ): Promise<void> {
     await this.httpClient.mutation(api.chat.writeChunk, {
-      sessionId,
+      chatSessionId: sessionId,
       messageId,
       chunk,
       sequence,
@@ -202,7 +262,7 @@ export class ConvexClientAdapter {
    */
   async completeMessage(sessionId: string, messageId: string, content: string): Promise<void> {
     await this.httpClient.mutation(api.chat.completeMessage, {
-      sessionId,
+      chatSessionId: sessionId,
       messageId,
       content,
     });
@@ -213,7 +273,7 @@ export class ConvexClientAdapter {
    */
   async sessionReady(sessionId: string): Promise<void> {
     await this.httpClient.mutation(api.chat.sessionReady, {
-      sessionId,
+      chatSessionId: sessionId,
     });
   }
 }

@@ -1,6 +1,7 @@
 import type { MachineId, WorkerId } from '@domain/valueObjects/Ids';
 import type { MachineToken } from '@domain/valueObjects/MachineToken';
 import { ConvexClientAdapter } from '@infrastructure/convex/ConvexClientAdapter';
+import { ChatSessionManager } from '../application/ChatSessionManager';
 import type { WorkerConfig } from '../config';
 
 /**
@@ -37,6 +38,7 @@ export class MachineServer {
   private _rootDirectory: string | null = null;
   private _isRunning = false;
   private _convexClient: ConvexClientAdapter | null = null;
+  private _chatManager: ChatSessionManager | null = null;
 
   /**
    * Starts the worker and connects to Convex.
@@ -82,11 +84,26 @@ export class MachineServer {
       );
     }
 
+    // Initialize chat session manager
+    console.log('💬 Initializing chat session manager...');
+    this._chatManager = new ChatSessionManager(this._convexClient);
+
+    // Set up chat event callbacks
+    this._convexClient.onSessionStart(async (sessionId, model) => {
+      console.log(`📞 Session start callback: ${sessionId}`);
+      await this._chatManager?.startSession(sessionId, model);
+    });
+
+    this._convexClient.onMessage(async (sessionId, messageId, content) => {
+      console.log(`📞 Message callback: ${messageId} in session ${sessionId}`);
+      await this._chatManager?.processMessage(sessionId, messageId, content);
+    });
+
+    console.log('✅ Chat system ready');
+
     // TODO: Implement remaining startup flow
     // 2. Sync state
-    // 3. Initialize OpenCode sessions
-    // 4. Subscribe to events
-    // 5. Start monitors
+    // 3. Start monitors
 
     this._isRunning = true;
   }
