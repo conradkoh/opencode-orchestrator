@@ -336,6 +336,7 @@ export function ChatInterface() {
               onSendMessage={handleSendMessage}
               disabled={!canSendMessage}
               placeholder="Type your message... (Shift+Enter for new line)"
+              autoFocus={true}
             />
           </div>
         </div>

@@ -15,6 +15,8 @@ export interface ChatInputProps {
   disabled?: boolean;
   /** Placeholder text for the input */
   placeholder?: string;
+  /** Whether to auto-focus the input on mount */
+  autoFocus?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ChatInput({
   onSendMessage,
   disabled,
   placeholder = 'Type your message...',
+  autoFocus = false,
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -49,9 +52,11 @@ export function ChatInput({
       onSendMessage(message.trim());
       setMessage('');
 
-      // Reset textarea height
+      // Reset textarea height and restore focus
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
+        // Restore focus after submission to maintain user's typing flow
+        textareaRef.current.focus();
       }
     },
     [message, disabled, onSendMessage]
@@ -76,6 +81,13 @@ export function ChatInput({
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
   }, []);
+
+  // Auto-focus on mount if requested
+  useEffect(() => {
+    if (autoFocus && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [autoFocus]);
 
   // Auto-resize textarea based on content
   useEffect(() => {
