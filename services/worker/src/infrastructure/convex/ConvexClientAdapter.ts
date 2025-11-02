@@ -180,6 +180,9 @@ export class ConvexClientAdapter {
     // Track which messages we've processed
     const processedMessages = new Set<string>();
 
+    // Track initialization state
+    let isInitialLoad = true;
+
     // Subscribe to sessions for this worker
     this.realtimeClient.onUpdate(
       api.chat.subscribeToWorkerSessions,
@@ -187,7 +190,16 @@ export class ConvexClientAdapter {
       (sessions) => {
         if (!sessions) return;
 
-        // Check for new sessions
+        // On first load, mark all existing sessions as seen (don't trigger callbacks)
+        if (isInitialLoad) {
+          for (const session of sessions) {
+            seenSessions.add(session.sessionId);
+          }
+          console.log(`📋 Marked ${seenSessions.size} existing sessions as seen`);
+          return;
+        }
+
+        // Check for new sessions (only after initial load)
         for (const session of sessions) {
           if (!seenSessions.has(session.sessionId) && session.status === 'active') {
             seenSessions.add(session.sessionId);
@@ -211,7 +223,66 @@ export class ConvexClientAdapter {
       (messages) => {
         if (!messages) return;
 
-        // Check for new user messages that need processing
+        // On first load, mark all existing messages as processed
+        // EXCEPT incomplete assistant messages (these need processing)
+        if (isInitialLoad) {
+          for (const message of messages) {
+            const messageKey = `${message.sessionId}:${message.messageId}`;
+
+            // Mark user messages as processed (don't reprocess old messages)
+            if (message.role === 'user' && message.completed) {
+              processedMessages.add(messageKey);
+            }
+
+            // Mark completed assistant messages as processed
+            if (message.role === 'assistant' && message.completed) {
+              processedMessages.add(messageKey);
+            }
+          }
+
+          console.log(`📋 Marked ${processedMessages.size} existing messages as processed`);
+
+          // Now check for any incomplete assistant messages that need processing
+          const incompleteAssistantMessages = messages.filter(
+            (m) => m.role === 'assistant' && !m.completed
+          );
+
+          if (incompleteAssistantMessages.length > 0) {
+            console.log(
+              `⚠️  Found ${incompleteAssistantMessages.length} incomplete assistant messages`
+            );
+
+            // For each incomplete assistant message, find the user message and process it
+            for (const assistantMsg of incompleteAssistantMessages) {
+              const userMessage = messages.find(
+                (m) =>
+                  m.sessionId === assistantMsg.sessionId &&
+                  m.role === 'user' &&
+                  m.completed &&
+                  m.timestamp < assistantMsg.timestamp
+              );
+
+              if (userMessage) {
+                console.log(`🔄 Reprocessing incomplete message: ${assistantMsg.messageId}`);
+
+                if (this.messageCallback) {
+                  this.messageCallback(
+                    assistantMsg.sessionId,
+                    assistantMsg.messageId,
+                    userMessage.content
+                  ).catch((error) => {
+                    console.error('❌ Error in message callback:', error);
+                  });
+                }
+              }
+            }
+          }
+
+          isInitialLoad = false;
+          return;
+        }
+
+        // After initial load, process new user messages
         for (const message of messages) {
           const messageKey = `${message.sessionId}:${message.messageId}`;
 
