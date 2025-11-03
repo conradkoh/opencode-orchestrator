@@ -235,6 +235,10 @@ Key behaviors:
 - Each worker has explicit `working_directory` (mandatory)
 - Command: `pnpm run opencode-orchestrator`
 - Use case: Production deployments, multiple projects, persistent configuration
+- **First-time setup**: Interactive wizard prompts for worker configuration (token, directory, URL)
+  - Working directory defaults to current directory
+  - Validates input at each step
+  - Creates configuration file automatically
 
 **Configuration Format (Production)**
 
