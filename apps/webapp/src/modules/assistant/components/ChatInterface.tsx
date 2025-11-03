@@ -51,9 +51,11 @@ export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
 
-  // Refs for imperative focus control
-  const activeSessionInputRef = useRef<ChatInputHandle>(null);
-  const newSessionInputRef = useRef<ChatInputHandle>(null);
+  // Single ref for chat input - React will attach it to whichever instance is currently mounted
+  const chatInputRef = useRef<ChatInputHandle>(null);
+
+  // Track when we need to focus the input after state changes
+  const [shouldFocusInput, setShouldFocusInput] = useState(false);
 
   const { connectWorker } = useConnectWorker();
 
@@ -133,6 +135,19 @@ export function ChatInterface() {
     }
   }, [selectedWorkerId, availableModels, selectedModel]);
 
+  // Handle focus after component re-renders (session restore, session end, message send)
+  useEffect(() => {
+    if (shouldFocusInput) {
+      // Use requestAnimationFrame to ensure the component has mounted/updated
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          chatInputRef.current?.focus();
+          setShouldFocusInput(false); // Reset flag
+        }, 100);
+      });
+    }
+  }, [shouldFocusInput]);
+
   /**
    * Handles machine selection change.
    * Updates URL which triggers re-render with new state.
@@ -190,17 +205,8 @@ export function ChatInterface() {
         // which may not have updated yet
         if (sessionIdToUse) {
           await sendMessageMutation({ chatSessionId: sessionIdToUse, content });
-
-          // Focus the appropriate input after message is sent
-          // Use setTimeout to ensure DOM updates and state changes have completed
-          setTimeout(() => {
-            if (hadSession) {
-              activeSessionInputRef.current?.focus();
-            } else {
-              // After creating a new session, the active session input will be rendered
-              activeSessionInputRef.current?.focus();
-            }
-          }, 100);
+          // Trigger focus after state updates
+          setShouldFocusInput(true);
         }
       } catch (error) {
         console.error('[ChatInterface] Failed to send message:', error);
@@ -221,11 +227,8 @@ export function ChatInterface() {
         // Update URL with restored session ID
         urlActions.setSessionId(sessionId);
         console.log('[ChatInterface] Session restored successfully');
-
-        // Focus the input after restoration
-        setTimeout(() => {
-          activeSessionInputRef.current?.focus();
-        }, 100);
+        // Trigger focus after the component re-renders with the new session
+        setShouldFocusInput(true);
       } catch (error) {
         console.error('Failed to restore session:', error);
       }
@@ -261,11 +264,8 @@ export function ChatInterface() {
       // Clear the session from URL to allow starting fresh
       urlActions.setSessionId(null);
       setIsEndingSession(false);
-
-      // Focus the new session input
-      setTimeout(() => {
-        newSessionInputRef.current?.focus();
-      }, 100);
+      // Trigger focus after the component re-renders without a session
+      setShouldFocusInput(true);
     } catch (error) {
       console.error('[ChatInterface] Failed to end session:', error);
       setIsEndingSession(false);
@@ -430,7 +430,7 @@ export function ChatInterface() {
           {/* Input Area */}
           <div className="p-4 pt-6">
             <ChatInputWithModel
-              ref={activeSessionInputRef}
+              ref={chatInputRef}
               onSendMessage={handleSendMessage}
               selectedModel={selectedModel}
               availableModels={availableModels}
@@ -465,7 +465,7 @@ export function ChatInterface() {
           {/* Chat input - always visible */}
           <div className="flex-1 flex flex-col justify-end p-4">
             <ChatInputWithModel
-              ref={newSessionInputRef}
+              ref={chatInputRef}
               onSendMessage={handleSendMessage}
               selectedModel={selectedModel}
               availableModels={availableModels}

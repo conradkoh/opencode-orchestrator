@@ -4,9 +4,11 @@
 
 Input components in React often need programmatic focus control from parent components (e.g., after submitting a message, restoring a session, etc.). Using timing-based approaches like `useEffect` with dependency keys is fragile and prone to race conditions.
 
-## Solution: `forwardRef` + `useImperativeHandle`
+Additionally, when parent components conditionally render different instances of the same component (e.g., "new session" input vs "active session" input), imperative focus calls from callbacks can target unmounted components.
 
-This is the **official React pattern** for imperative actions like focus management.
+## Solution: `forwardRef` + `useImperativeHandle` + Effect-based Focus
+
+This combines React's **official pattern for imperative actions** with **declarative state management** for focus control.
 
 ### Implementation
 
@@ -40,22 +42,33 @@ export const ChatInputWithModel = forwardRef<ChatInputHandle, ChatInputWithModel
 );
 ```
 
-#### 2. Parent Component
+#### 2. Parent Component (with State-based Focus Triggering)
 
 ```typescript
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 function ParentComponent() {
   const inputRef = useRef<ChatInputHandle>(null);
+  const [shouldFocusInput, setShouldFocusInput] = useState(false);
+
+  // Effect that handles focus after component re-renders
+  useEffect(() => {
+    if (shouldFocusInput) {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          inputRef.current?.focus();
+          setShouldFocusInput(false); // Reset flag
+        }, 100);
+      });
+    }
+  }, [shouldFocusInput]);
 
   const handleAction = async () => {
     // Perform some async action
     await someAsyncOperation();
     
-    // Programmatically focus the input
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100); // Small delay for DOM updates
+    // Trigger focus declaratively
+    setShouldFocusInput(true);
   };
 
   return (
@@ -64,13 +77,19 @@ function ParentComponent() {
 }
 ```
 
+**Why use state instead of direct calls?**
+- When parent conditionally renders different component instances, refs may point to unmounted components
+- State ensures focus is applied after React completes re-rendering
+- More predictable timing with React's render cycle
+
 ## Benefits
 
-1. **Explicit Control**: Parent explicitly calls `focus()` when needed
-2. **No Race Conditions**: Doesn't rely on useEffect dependency arrays
-3. **Type-Safe**: TypeScript ensures correct usage
-4. **React Pattern**: Official React pattern for imperative actions
-5. **Maintainable**: Clear intent and easy to debug
+1. **Declarative**: Focus is triggered by state changes, not imperative calls
+2. **Reliable Timing**: Uses `requestAnimationFrame` + state to ensure components are mounted
+3. **Handles Conditional Rendering**: Works when parent switches between component instances
+4. **Type-Safe**: TypeScript ensures correct usage via `ChatInputHandle` interface
+5. **React Pattern**: Combines official patterns (refs + state) properly
+6. **Maintainable**: Clear intent and easy to debug
 
 ## Anti-Patterns to Avoid
 
@@ -82,16 +101,26 @@ useEffect(() => { focus(); }, [focusKey]);
 setFocusKey(prev => prev + 1); // Parent triggers focus
 ```
 
-❌ **Don't use timing-based hacks**:
+❌ **Don't call focus directly from callbacks**:
+```typescript
+// BAD: May target unmounted component when conditional rendering
+const handleAction = async () => {
+  await someAction();
+  inputRef.current?.focus(); // Component might not be mounted yet!
+};
+```
+
+❌ **Don't use long arbitrary timeouts**:
 ```typescript
 // BAD: Race conditions and unreliable
 setTimeout(() => inputRef.current?.focus(), 500);
 ```
 
-✅ **Do use refs and imperative handle**:
+✅ **Do use state + useEffect + refs**:
 ```typescript
-// GOOD: Explicit, reliable, maintainable
-inputRef.current?.focus();
+// GOOD: Declarative, reliable, works with conditional rendering
+setShouldFocusInput(true);
+// useEffect handles focus after component mounts/updates
 ```
 
 ## When to Use
