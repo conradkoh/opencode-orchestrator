@@ -9,6 +9,8 @@ A distributed system for orchestrating local workers through a web interface, en
 1. **Next.JS Webapp** - Web interface for users to orchestrate workers via chat
 2. **Convex Backend** - Realtime backend that captures messages in a stateful way and facilitates communication between workers and frontend
 3. **Opencode Worker** - Local application that subscribes to a Convex collection and processes delegated tasks
+   - **Development Mode**: Single worker using `.env` configuration for local development
+   - **Production Mode**: Multi-worker orchestration from centralized `~/.config/opencode-orchestrator/workers.json` configuration
 
 ## Core Flows
 
@@ -200,11 +202,12 @@ Key behaviors:
 
 **Worker Token Authentication**
 
-- Format: `machine_<machine_id>:worker_<worker_id>`
-- Each worker gets a unique token generated from the web UI
+- Format: `machine_<machine_id>:worker_<worker_id>:secret_<secret>`
+- Each worker gets a unique token with cryptographic secret generated from the web UI
 - Workers require explicit user approval before they can start
 - Individual worker compromise doesn't affect the entire cluster
-- Tokens are stored in worker's `.env` file as `WORKER_TOKEN`
+- **Development Mode**: Tokens stored in worker's `.env` file as `WORKER_TOKEN`
+- **Production Mode**: Tokens stored in `~/.config/opencode-orchestrator/workers.json` with additional configuration
 
 **Security Benefits**
 
@@ -213,6 +216,48 @@ Key behaviors:
 - **Audit Trail**: Track which user approved which worker and when
 - **Explicit Authorization**: No worker can start without user approval
 - **Machine Isolation**: Machine record has no authentication credentials
+
+### Worker Deployment & Configuration
+
+**Development Mode**
+
+- Single worker process for local development
+- Configuration via `.env` file in worker directory
+- Working directory: `process.cwd()` (current directory)
+- Command: `pnpm run dev` (with auto-reload)
+- Use case: Local development, testing, single project
+
+**Production Mode**
+
+- Multi-worker orchestration from centralized configuration
+- Configuration via `~/.config/opencode-orchestrator/workers.json`
+- Supports JSONC format (JSON with `//` and `/* */` comments)
+- Each worker has explicit `working_directory` (mandatory)
+- Command: `pnpm run opencode-orchestrator`
+- Use case: Production deployments, multiple projects, persistent configuration
+
+**Configuration Format (Production)**
+
+```jsonc
+{
+  "workers": [
+    // Main project worker
+    {
+      "token": "machine_abc123:worker_xyz789:secret_def456ghi789jkl012",
+      "working_directory": "~/Documents/Projects/main-project",  // Required
+      "convex_url": "https://your-deployment.convex.cloud"
+    }
+  ]
+}
+```
+
+**Worker Behavior**
+
+- Workers start in parallel with isolated failure handling
+- Partial failures don't affect other workers
+- Graceful shutdown with 30-second timeout
+- Path expansion: Supports `~` (home directory) and relative paths
+- Validation: All fields mandatory with clear error messages
 
 ### Worker Identity & Concurrency
 
@@ -223,6 +268,7 @@ Key behaviors:
 - Multiple concurrent chat sessions are supported per worker
 - Each chat session spawns its own opencode process and session
 - Enables parallel task execution within the same worker context
+- **Production Mode**: Multiple workers can run across different directories simultaneously
 
 **Session Lifecycle & Timeouts**
 

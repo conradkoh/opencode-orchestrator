@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as readline from 'node:readline';
 import { z } from 'zod';
 import type { OrchestratorConfig, WorkerConfig, WorkerConfigEntry, WorkersConfig } from './types';
 
@@ -83,20 +84,109 @@ export function expandPath(filepath: string): string {
  * Create a template workers.json file with instructions.
  *
  * @param filepath - Path to create the template file
+ * @param workerConfig - Optional worker configuration to include
  */
-async function createTemplateWorkersJson(filepath: string): Promise<void> {
+async function createTemplateWorkersJson(
+  filepath: string,
+  workerConfig?: WorkerConfigEntry
+): Promise<void> {
   const template: WorkersConfig = {
-    workers: [
-      {
-        token: 'machine_abc123:worker_xyz789:secret_def456ghi789jkl012',
-        working_directory: '~/Documents/Projects/my-project',
-        convex_url: 'https://your-deployment.convex.cloud',
-      },
-    ],
+    workers: workerConfig
+      ? [workerConfig]
+      : [
+          {
+            token: 'machine_abc123:worker_xyz789:secret_def456ghi789jkl012',
+            working_directory: '~/Documents/Projects/my-project',
+            convex_url: 'https://your-deployment.convex.cloud',
+          },
+        ],
   };
 
   const content = JSON.stringify(template, null, 2);
   await fs.writeFile(filepath, content, 'utf-8');
+}
+
+/**
+ * Prompt user for input via stdin.
+ *
+ * @param prompt - Prompt message to display
+ * @param defaultValue - Optional default value
+ * @returns Promise resolving to user input (or default if empty)
+ */
+async function promptForInput(prompt: string, defaultValue?: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const displayPrompt = defaultValue ? `${prompt} [${defaultValue}]: ` : `${prompt}: `;
+
+  return new Promise((resolve) => {
+    rl.question(displayPrompt, (answer) => {
+      rl.close();
+      const trimmed = answer.trim();
+      resolve(trimmed || defaultValue || '');
+    });
+  });
+}
+
+/**
+ * Interactive setup for first worker configuration.
+ * Prompts user for worker token, working directory, and Convex URL.
+ *
+ * @returns WorkerConfigEntry for the new worker
+ */
+async function interactiveWorkerSetup(): Promise<WorkerConfigEntry> {
+  console.log('\n🚀 First Worker Setup\n');
+  console.log("No workers configuration found. Let's set up your first worker!\n");
+
+  // Get worker token
+  console.log('📋 Worker Token');
+  console.log('   To get your worker token:');
+  console.log('   1. Go to the web UI');
+  console.log('   2. Select your machine');
+  console.log('   3. Click the menu (⋮) next to the machine');
+  console.log('   4. Select "Add Worker"');
+  console.log('   5. Copy the token shown\n');
+
+  const token = await promptForInput('Enter worker token');
+
+  // Validate token format
+  if (!token.match(/^machine_[a-zA-Z0-9_-]+:worker_[a-zA-Z0-9_-]+:secret_[a-zA-Z0-9_-]+$/)) {
+    throw new Error(
+      'Invalid worker token format. Expected: machine_<machine_id>:worker_<worker_id>:secret_<secret>'
+    );
+  }
+
+  // Get working directory (default to current directory)
+  const defaultDir = process.cwd();
+  console.log('\n📂 Working Directory');
+  console.log('   This is where the worker will execute tasks.');
+  console.log('   You can use absolute paths, ~ for home directory, or relative paths.\n');
+
+  const workingDirectory = await promptForInput('Enter working directory', defaultDir);
+
+  if (!workingDirectory) {
+    throw new Error('Working directory is required');
+  }
+
+  // Get Convex URL
+  console.log('\n📡 Convex Backend URL');
+  console.log('   Get this from your Convex dashboard');
+  console.log('   Example: https://your-deployment.convex.cloud\n');
+
+  const convexUrl = await promptForInput('Enter Convex URL');
+
+  // Validate URL format
+  if (!convexUrl.startsWith('https://')) {
+    throw new Error('Convex URL must start with https://');
+  }
+
+  return {
+    token,
+    working_directory: workingDirectory,
+    convex_url: convexUrl,
+  };
 }
 
 /**
@@ -138,9 +228,10 @@ function stripJsonComments(content: string): string {
 
 /**
  * Load and validate workers configuration from workers.json.
- * Creates a template file if it doesn't exist.
+ * Prompts for interactive setup if file doesn't exist.
  * Supports JSONC format (JSON with comments).
  *
+ * @param interactive - Whether to prompt for interactive setup if file doesn't exist (default: true)
  * @returns Validated workers configuration
  * @throws Error if validation fails
  *
@@ -152,7 +243,7 @@ function stripJsonComments(content: string): string {
  * }
  * ```
  */
-export async function loadWorkersJson(): Promise<WorkersConfig> {
+export async function loadWorkersJson(interactive = true): Promise<WorkersConfig> {
   const configDir = await ensureConfigDir();
   const workersJsonPath = path.join(configDir, WORKERS_JSON_FILENAME);
 
@@ -160,13 +251,38 @@ export async function loadWorkersJson(): Promise<WorkersConfig> {
   try {
     await fs.access(workersJsonPath);
   } catch {
-    // File doesn't exist, create template
-    console.log(`📝 Creating template configuration at: ${workersJsonPath}`);
-    await createTemplateWorkersJson(workersJsonPath);
+    // File doesn't exist
+    if (!interactive) {
+      // Non-interactive mode: create template and exit
+      console.log(`📝 Creating template configuration at: ${workersJsonPath}`);
+      await createTemplateWorkersJson(workersJsonPath);
 
-    throw new Error(
-      `\nNo workers configuration found. A template has been created at:\n${workersJsonPath}\n\nPlease edit this file and add your worker configurations, then run the command again.`
-    );
+      throw new Error(
+        `\nNo workers configuration found. A template has been created at:\n${workersJsonPath}\n\nPlease edit this file and add your worker configurations, then run the command again.`
+      );
+    }
+
+    // Interactive mode: prompt user for first worker
+    try {
+      const firstWorker = await interactiveWorkerSetup();
+
+      // Create config file with the user's input
+      await createTemplateWorkersJson(workersJsonPath, firstWorker);
+
+      console.log(`\n✅ Configuration saved to: ${workersJsonPath}`);
+      console.log('   You can add more workers by editing this file later.\n');
+
+      // Return the newly created config
+      return { workers: [firstWorker] };
+    } catch (error) {
+      // If interactive setup fails, create template as fallback
+      console.log('\n❌ Interactive setup failed. Creating template file...');
+      await createTemplateWorkersJson(workersJsonPath);
+
+      throw new Error(
+        `\nSetup failed: ${error instanceof Error ? error.message : String(error)}\n\nA template has been created at:\n${workersJsonPath}\n\nPlease edit this file and add your worker configurations, then run the command again.`
+      );
+    }
   }
 
   // Read and parse the file
