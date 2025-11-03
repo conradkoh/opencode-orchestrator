@@ -388,17 +388,8 @@ export class ChatSessionManager {
   }
 
   /**
-   * Sync sessions between Convex and OpenCode using timestamp-based incremental sync.
-   * - Updates session names from OpenCode
-   * - Marks deleted sessions as soft-deleted
-   * - Syncs new OpenCode sessions to Convex
-   *
-   * Optimization strategy:
-   * 1. Fetch last sync timestamp from Convex
-   * 2. Only process Convex sessions modified since last sync
-   * 3. Fetch all OpenCode sessions (SDK doesn't support timestamp filtering)
-   * 4. Parallelize all Convex writes
-   * 5. Update sync timestamp on success
+   * Sync sessions between Convex and OpenCode.
+   * Uses the OpencodeConvexSync component for clean, testable, idempotent sync logic.
    */
   private async syncSessionsWithOpencode(): Promise<void> {
     if (!this.opencodeClient) {
@@ -406,151 +397,69 @@ export class ChatSessionManager {
       return;
     }
 
-    const syncStartTime = Date.now();
-
     try {
-      console.log('🔄 Starting incremental session sync with OpenCode...');
+      // Create sync dependencies that adapt our infrastructure to the sync component
+      const syncDeps: SyncDependencies = {
+        fetchOpencodeSessions: async () => {
+          const sessions = await this.opencodeAdapter.listSessions(this.opencodeClient!);
+          return sessions.map((s) => ({ id: s.id, title: s.title }));
+        },
 
-      // Step 1: Get last sync timestamp
-      const lastSyncedAt = await this.convexClient.getLastSyncTimestamp();
-      console.log(`📅 Last sync: ${lastSyncedAt ? new Date(lastSyncedAt).toISOString() : 'never'}`);
+        fetchConvexSessions: async () => {
+          const sessions = await this.convexClient.getActiveSessions();
+          return sessions.map((s) => ({
+            chatSessionId: s.chatSessionId,
+            opencodeSessionId: s.opencodeSessionId,
+            name: s.name,
+            deletedInOpencode: s.deletedInOpencode,
+          }));
+        },
 
-      // Step 2 & 3: Fetch ALL sessions (we need complete picture for duplicate detection)
-      const [opencodeSessions, convexSessions] = await Promise.all([
-        this.opencodeAdapter.listSessions(this.opencodeClient),
-        this.convexClient.getActiveSessions(),
-      ]);
+        updateSessionName: async (chatSessionId, name) => {
+          await this.convexClient.updateSessionName(chatSessionId, name);
+        },
 
-      console.log(
-        `📊 Fetched ${opencodeSessions.length} OpenCode sessions, ${convexSessions.length} Convex sessions`
-      );
+        markSessionDeleted: async (chatSessionId) => {
+          await this.convexClient.markSessionDeletedInOpencode(chatSessionId);
+          // Also remove from active sessions in memory
+          this.activeSessions.delete(chatSessionId);
+        },
 
-      const opencodeSessionIds = new Set(opencodeSessions.map((s) => s.id));
-      const convexOpencodeIds = new Set(
-        convexSessions.map((cs) => cs.opencodeSessionId as string).filter(Boolean)
-      );
+        createSyncedSession: async (opencodeSessionId, title) => {
+          // Infer model (default to first available model)
+          const models = await this.opencodeAdapter.listModels(this.opencodeClient!);
+          const defaultModel = models.length > 0 ? models[0].id : 'unknown';
 
-      // Step 4: Collect all write operations for parallelization
-      const writeOps: Promise<void>[] = [];
-      let nameUpdatesQueued = 0;
-      let deletions = 0;
-      let newSessions = 0;
-
-      // 4a. Update session names from OpenCode (ONLY if name actually changed)
-      for (const ocSession of opencodeSessions) {
-        const convexSession = convexSessions.find((cs) => cs.opencodeSessionId === ocSession.id);
-
-        if (convexSession && ocSession.title && convexSession.chatSessionId) {
-          // Only sync if name is different from what's stored
-          // The mutation will double-check and skip if unchanged
-          if (convexSession.name !== ocSession.title) {
-            nameUpdatesQueued++;
-            writeOps.push(
-              this.convexClient
-                .updateSessionName(convexSession.chatSessionId, ocSession.title)
-                .then((updated) => {
-                  if (updated) {
-                    console.log(
-                      `📝 Updated name for session ${convexSession.chatSessionId}: "${ocSession.title}"`
-                    );
-                  }
-                })
-                .catch((error) => {
-                  console.warn(
-                    `⚠️  Failed to update name for ${convexSession.chatSessionId}:`,
-                    error
-                  );
-                })
-            );
-          }
-        }
-      }
-
-      // 4b. Mark deleted sessions (exist in Convex but not in OpenCode)
-      for (const convexSession of convexSessions) {
-        if (
-          convexSession.opencodeSessionId &&
-          !opencodeSessionIds.has(convexSession.opencodeSessionId) &&
-          !convexSession.deletedInOpencode // Don't re-mark already deleted sessions
-        ) {
-          deletions++;
-          writeOps.push(
-            this.convexClient
-              .markSessionDeletedInOpencode(convexSession.chatSessionId)
-              .then(() => {
-                console.log(
-                  `🗑️  Marked session ${convexSession.chatSessionId} as deleted (removed from OpenCode)`
-                );
-                // Remove from active sessions in memory
-                this.activeSessions.delete(convexSession.chatSessionId);
-              })
-              .catch((error) => {
-                console.warn(`⚠️  Failed to mark ${convexSession.chatSessionId} as deleted:`, error);
-              })
+          const chatSessionId = await this.convexClient.createSyncedSession(
+            opencodeSessionId as OpencodeSessionId,
+            defaultModel,
+            title
           );
-        }
-      }
 
-      // 4c. Sync new sessions created directly in OpenCode (check against ALL Convex sessions)
-      for (const ocSession of opencodeSessions) {
-        if (!convexOpencodeIds.has(ocSession.id as string)) {
-          newSessions++;
-          writeOps.push(
-            (async () => {
-              try {
-                console.log(
-                  `🆕 Found new OpenCode session: ${ocSession.id} "${ocSession.title || '(unnamed)'}"`
-                );
+          // Add to active sessions in memory
+          this.activeSessions.set(chatSessionId, {
+            chatSessionId,
+            opencodeSessionId: opencodeSessionId as OpencodeSessionId,
+            model: defaultModel,
+            startedAt: Date.now(),
+            isInitializing: false,
+          });
 
-                // Try to infer model (default to first available model)
-                const models = await this.opencodeAdapter.listModels(this.opencodeClient!);
-                const defaultModel = models.length > 0 ? models[0].id : 'unknown';
+          return chatSessionId;
+        },
 
-                const chatSessionId = await this.convexClient.createSyncedSession(
-                  ocSession.id as OpencodeSessionId,
-                  defaultModel,
-                  ocSession.title
-                );
+        recordSyncTimestamp: async (timestamp) => {
+          await this.convexClient.updateLastSyncTimestamp(timestamp);
+        },
+      };
 
-                // Add to active sessions
-                this.activeSessions.set(chatSessionId, {
-                  chatSessionId,
-                  opencodeSessionId: ocSession.id as OpencodeSessionId,
-                  model: defaultModel,
-                  startedAt: Date.now(),
-                  isInitializing: false,
-                });
-
-                console.log(`✅ Synced new session ${chatSessionId} from OpenCode`);
-              } catch (error) {
-                console.error(`❌ Failed to sync OpenCode session ${ocSession.id}:`, error);
-              }
-            })()
-          );
-        }
-      }
-
-      // Step 5: Execute all writes in parallel
-      if (writeOps.length > 0) {
-        console.log(
-          `⚡ Executing ${writeOps.length} write operations (${nameUpdatesQueued} name updates, ${deletions} deletions, ${newSessions} new sessions)...`
-        );
-        await Promise.allSettled(writeOps);
-      } else {
-        console.log('✅ No changes detected - sync state is stable');
-      }
-
-      // Step 6: Update last sync timestamp
-      await this.convexClient.updateLastSyncTimestamp(syncStartTime);
-
-      const duration = Date.now() - syncStartTime;
-      console.log(`✅ Session sync complete in ${duration}ms`);
+      // Execute the clean, tested sync logic
+      await executeSync(syncDeps);
     } catch (error) {
       console.error(
         '❌ Failed to sync sessions:',
         error instanceof Error ? error.message : String(error)
       );
-      // Don't update sync timestamp on failure - will retry with same timestamp
     }
   }
 
