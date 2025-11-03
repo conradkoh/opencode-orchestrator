@@ -22,7 +22,7 @@ export async function loadConfig(): Promise<WorkerConfig | null> {
   try {
     const env = loadEnv();
     return parseWorkerConfig(env);
-  } catch (error) {
+  } catch (_error) {
     // Environment validation failed or variables missing
     return null;
   }

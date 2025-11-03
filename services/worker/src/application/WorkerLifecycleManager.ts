@@ -227,6 +227,7 @@ export class WorkerLifecycleManager implements IWorkerLifecycleManager {
     this.config = null;
 
     // Mark as stopped (manually set since STOPPING has no outgoing transitions)
+    // biome-ignore lint/suspicious/noExplicitAny: STOPPING has no outgoing transitions, manual state set required
     (this.fsm as any)._currentState = WorkerState.STOPPED;
   }
 

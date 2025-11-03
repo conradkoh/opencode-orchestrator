@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { SessionIdArg } from 'convex-helpers/server/sessions';
 import { getAuthUserOptional } from '../modules/auth/getAuthUser';
 import { internal } from './_generated/api';
-import { internalAction, mutation, query } from './_generated/server';
+import { mutation, query } from './_generated/server';
 
 /**
  * Create a new worker token.

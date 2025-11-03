@@ -113,15 +113,54 @@ async function main(): Promise<void> {
 
   const server = new MachineServer();
 
-  // Handle graceful shutdown
-  const shutdown = async () => {
-    console.log('\n\n👋 Shutting down gracefully...');
-    await server.stop();
-    process.exit(0);
+  // Track if shutdown is already in progress
+  let isShuttingDown = false;
+
+  // Handle graceful shutdown with timeout
+  const shutdown = async (signal: string) => {
+    // Prevent multiple shutdown attempts
+    if (isShuttingDown) {
+      console.log(`\n⚠️  Shutdown already in progress, ignoring ${signal}`);
+      return;
+    }
+    isShuttingDown = true;
+
+    console.log(`\n\n👋 Received ${signal}, shutting down gracefully...`);
+
+    // Set a timeout to force exit if graceful shutdown takes too long
+    const forceExitTimeout = setTimeout(() => {
+      console.error('\n⚠️  Graceful shutdown timed out after 10 seconds, forcing exit...');
+      process.exit(1);
+    }, 10000); // 10 second timeout
+
+    try {
+      await server.stop();
+      clearTimeout(forceExitTimeout);
+      console.log('✅ Graceful shutdown completed');
+      process.exit(0);
+    } catch (error) {
+      clearTimeout(forceExitTimeout);
+      console.error('❌ Error during shutdown:', error);
+      process.exit(1);
+    }
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  // Handle various termination signals
+  process.on('SIGINT', () => shutdown('SIGINT')); // Ctrl+C
+  process.on('SIGTERM', () => shutdown('SIGTERM')); // Kill command
+  process.on('SIGQUIT', () => shutdown('SIGQUIT')); // Quit signal
+  process.on('SIGHUP', () => shutdown('SIGHUP')); // Terminal closed
+
+  // Handle uncaught errors
+  process.on('uncaughtException', (error) => {
+    console.error('\n💥 Uncaught exception:', error);
+    shutdown('uncaughtException').catch(() => process.exit(1));
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('\n💥 Unhandled rejection at:', promise, 'reason:', reason);
+    shutdown('unhandledRejection').catch(() => process.exit(1));
+  });
 
   try {
     // Start the server with parsed config

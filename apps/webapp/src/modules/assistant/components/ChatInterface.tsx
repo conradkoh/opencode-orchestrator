@@ -187,7 +187,6 @@ export function ChatInterface() {
 
       try {
         let sessionIdToUse = session?.sessionId;
-        const hadSession = !!session;
 
         // If no active session, create one first
         if (!session) {

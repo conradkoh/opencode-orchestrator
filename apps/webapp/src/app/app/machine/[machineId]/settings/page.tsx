@@ -1,7 +1,6 @@
-import { ArrowLeftIcon, ServerIcon, Trash2Icon } from 'lucide-react';
+import { ArrowLeftIcon, ServerIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MachineSettingsContent } from '@/modules/assistant/components/MachineSettingsContent';
 
 /**

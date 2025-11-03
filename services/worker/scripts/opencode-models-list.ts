@@ -9,8 +9,8 @@
  * Run with: bun run scripts/opencode-models-list.ts
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 

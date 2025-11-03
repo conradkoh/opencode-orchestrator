@@ -1,4 +1,5 @@
 import type { IOpencodeInstance } from '../domain/interfaces/IOpencodeClient';
+import { validateSessionId } from '../domain/valueObjects/Ids';
 import type { ConvexClientAdapter } from '../infrastructure/convex/ConvexClientAdapter';
 import { OpencodeClientAdapter } from '../infrastructure/opencode/OpencodeClientAdapter';
 
@@ -92,8 +93,12 @@ export class ChatSessionManager {
       // Ensure opencode client is initialized
       await this.ensureOpencodeClient();
 
+      if (!this.opencodeClient) {
+        throw new Error('Opencode client not initialized');
+      }
+
       // Create opencode session
-      const opencodeSession = await this.opencodeAdapter.createSession(this.opencodeClient!, model);
+      const opencodeSession = await this.opencodeAdapter.createSession(this.opencodeClient, model);
       console.log(`📝 Opencode session created: ${opencodeSession.id}`);
 
       // Update session with opencode session ID
@@ -164,10 +169,17 @@ export class ChatSessionManager {
 
       await this.ensureOpencodeClient();
 
+      if (!this.opencodeClient) {
+        const errorMsg = 'Opencode client not initialized';
+        console.error(`❌ ${errorMsg}`);
+        await this.writeError(sessionId, messageId, errorMsg);
+        return;
+      }
+
       // Send prompt to opencode and stream response
       const responseIterator = this.opencodeAdapter.sendPrompt(
-        this.opencodeClient!,
-        session.opencodeSessionId as any,
+        this.opencodeClient,
+        validateSessionId(session.opencodeSessionId),
         content,
         session.model
       );
@@ -210,6 +222,47 @@ export class ChatSessionManager {
    */
   getActiveSessions(): SessionInfo[] {
     return Array.from(this.activeSessions.values());
+  }
+
+  /**
+   * Disconnect all active sessions and cleanup resources.
+   * Called during graceful shutdown.
+   */
+  async disconnectAll(): Promise<void> {
+    console.log(`🔌 Disconnecting ${this.activeSessions.size} active session(s)...`);
+
+    // Close all active sessions
+    const sessionIds = Array.from(this.activeSessions.keys());
+    for (const sessionId of sessionIds) {
+      try {
+        console.log(`  Closing session ${sessionId}...`);
+        // Remove from active sessions
+        this.activeSessions.delete(sessionId);
+      } catch (error) {
+        console.error(
+          `  ⚠️  Error closing session ${sessionId}:`,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    // Close opencode client if initialized
+    if (this.opencodeClient) {
+      try {
+        console.log('  Closing opencode client...');
+        // The opencode client doesn't have an explicit close method in the interface
+        // but we can null it out to allow GC
+        this.opencodeClient = null;
+        console.log('  ✅ Opencode client closed');
+      } catch (error) {
+        console.error(
+          '  ⚠️  Error closing opencode client:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    console.log('✅ All sessions disconnected');
   }
 }
 

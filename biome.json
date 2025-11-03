@@ -46,7 +46,8 @@
       "!**/build",
       "!**/.convex",
       "!**/.git/**",
-      "!**/convex/_generated/**"
+      "!**/convex/_generated/**",
+      "!**/coverage/**"
     ]
   }
 }

@@ -12,6 +12,7 @@
  * Run with: pnpm tsx src/scripts/test-opencode.ts
  */
 
+import { validateSessionId } from '../domain/valueObjects/Ids';
 import { OpencodeClientAdapter } from '../infrastructure/opencode/OpencodeClientAdapter';
 
 async function main() {
@@ -49,7 +50,12 @@ async function main() {
     let fullResponse = '';
 
     // The adapter returns an AsyncIterator, we need to iterate it properly
-    const responseIterator = adapter.sendPrompt(client, session.id as any, prompt, model);
+    const responseIterator = adapter.sendPrompt(
+      client,
+      validateSessionId(session.id),
+      prompt,
+      model
+    );
     for await (const chunk of responseIterator) {
       process.stdout.write(chunk);
       fullResponse += chunk;
@@ -60,7 +66,7 @@ async function main() {
 
     // 5. Clean up
     console.log('5️⃣  Cleaning up...');
-    await adapter.deleteSession(client, session.id as any);
+    await adapter.deleteSession(client, validateSessionId(session.id));
     console.log('   ✅ Session deleted');
 
     await adapter.closeClient(client);

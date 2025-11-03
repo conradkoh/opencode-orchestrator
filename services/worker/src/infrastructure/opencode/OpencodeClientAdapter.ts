@@ -1,3 +1,5 @@
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import type {
   IOpencodeClient,
   IOpencodeInstance,
@@ -6,8 +8,6 @@ import type {
 import type { SessionId } from '@domain/valueObjects/Ids';
 import type { OpencodeClient } from '@opencode-ai/sdk';
 import { createOpencode } from '@opencode-ai/sdk';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
@@ -51,10 +51,10 @@ export class OpencodeClientAdapter implements IOpencodeClient {
    */
   private async isPortAvailable(port: number): Promise<boolean> {
     return new Promise((resolve) => {
-      const net = require('net');
+      const net = require('node:net');
       const server = net.createServer();
 
-      server.once('error', (err: any) => {
+      server.once('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
           resolve(false);
         } else {
