@@ -200,12 +200,26 @@ export class ChatSessionManager {
         return;
       }
 
+      // Fetch latest session data from Convex to get the current model
+      // This ensures we use the latest model if it was changed mid-conversation
+      const activeSessions = await this.convexClient.getActiveSessions();
+      const convexSession = activeSessions.find((s) => s.chatSessionId === chatSessionId);
+
+      // Use the model from Convex if available, otherwise fall back to local session model
+      const modelToUse = convexSession?.model || session.model;
+
+      // Update local session model if it changed
+      if (convexSession?.model && convexSession.model !== session.model) {
+        console.log(`🔄 Model changed from ${session.model} to ${convexSession.model}`);
+        session.model = convexSession.model;
+      }
+
       // Send prompt to opencode and stream response
       const responseIterator = this.opencodeAdapter.sendPrompt(
         this.opencodeClient,
         validateSessionId(session.opencodeSessionId),
         content,
-        session.model
+        modelToUse
       );
 
       let fullResponse = '';

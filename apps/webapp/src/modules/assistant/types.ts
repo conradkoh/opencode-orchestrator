@@ -205,6 +205,13 @@ export interface AssistantChatReturn {
    * @returns Promise that resolves when message is sent
    */
   sendMessage: (content: string) => Promise<void>;
+  /**
+   * Updates the AI model for the current active session.
+   * Allows switching models mid-conversation.
+   * @param model - New AI model identifier to use
+   * @returns Promise that resolves when model is updated
+   */
+  updateModel: (model: string) => Promise<void>;
 
   // State
   /** Whether any operation is in progress */

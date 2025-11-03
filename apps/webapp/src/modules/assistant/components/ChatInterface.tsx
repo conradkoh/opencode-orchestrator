@@ -77,8 +77,16 @@ export function ChatInterface() {
   const availableModels = useMemo(() => workerModels?.map((m) => m.id) || [], [workerModels]);
 
   const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedWorkerId);
-  const { session, startSession, restoreSession, endSession, clearSession, messages, isLoading } =
-    useAssistantChat(selectedWorkerId);
+  const {
+    session,
+    startSession,
+    restoreSession,
+    endSession,
+    clearSession,
+    messages,
+    updateModel,
+    isLoading,
+  } = useAssistantChat(selectedWorkerId);
 
   // Get sendMessage mutation directly for auto-session creation
   const sendMessageMutation = useSessionMutation(api.chat.sendMessage);
@@ -158,6 +166,14 @@ export function ChatInterface() {
       setSelectedModel(availableModels[0]);
     }
   }, [selectedWorkerId, availableModels, selectedModel]);
+
+  // Sync selected model with session's model when session is restored
+  useEffect(() => {
+    if (session && session.model && session.model !== selectedModel) {
+      console.log('[ChatInterface] Syncing selected model with session model:', session.model);
+      setSelectedModel(session.model);
+    }
+  }, [session, selectedModel]);
 
   // Handle focus after component re-renders (session restore, session end, message send)
   useEffect(() => {
@@ -297,11 +313,29 @@ export function ChatInterface() {
 
   /**
    * Handles model selection change.
+   * If there's an active session, updates the session's model.
+   * Otherwise, just updates local state.
    */
-  const handleModelChange = useCallback((model: string) => {
-    console.log('[ChatInterface] Model changed to:', model);
-    setSelectedModel(model);
-  }, []);
+  const handleModelChange = useCallback(
+    async (model: string) => {
+      console.log('[ChatInterface] Model changed to:', model);
+      setSelectedModel(model);
+
+      // If there's an active session, update the model in the backend
+      if (session && session.status === 'active') {
+        try {
+          console.log('[ChatInterface] Updating session model to:', model);
+          await updateModel(model);
+          console.log('[ChatInterface] Session model updated successfully');
+        } catch (error) {
+          console.error('[ChatInterface] Failed to update session model:', error);
+          // Revert local state on error
+          setSelectedModel(session.model);
+        }
+      }
+    },
+    [session, updateModel]
+  );
 
   /**
    * Handles retrying worker connection

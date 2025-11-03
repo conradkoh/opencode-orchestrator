@@ -181,7 +181,7 @@ export const ChatInputWithModel = forwardRef<ChatInputHandle, ChatInputWithModel
                 models={availableModels}
                 selectedModel={selectedModel}
                 onModelChange={onModelChange}
-                disabled={hasActiveSession || disabled}
+                disabled={disabled}
               />
             </div>
             <Button

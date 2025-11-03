@@ -31,6 +31,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   const startSessionMutation = useSessionMutation(api.chat.startSession);
   const endSessionMutation = useSessionMutation(api.chat.endSession);
   const sendMessageMutation = useSessionMutation(api.chat.sendMessage);
+  const updateSessionModelMutation = useSessionMutation(api.chat.updateSessionModel);
 
   // Queries
   const sessionData = useSessionQuery(
@@ -228,6 +229,33 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   );
 
   /**
+   * Updates the AI model for the current active session.
+   * Allows switching models mid-conversation.
+   */
+  const updateModel = useCallback(
+    async (model: string): Promise<void> => {
+      if (!activeSessionId) throw new Error('No active session');
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        console.log('[useAssistantChat] Updating model to:', model);
+        await updateSessionModelMutation({ chatSessionId: activeSessionId, model });
+        console.log('[useAssistantChat] Model updated successfully');
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error('[useAssistantChat] Error updating model:', error);
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [activeSessionId, updateSessionModelMutation]
+  );
+
+  /**
    * Clears the current active session without terminating it.
    * Used when navigating away from a session.
    */
@@ -250,6 +278,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     clearSession,
     messages: messagesWithChunks,
     sendMessage,
+    updateModel,
     isLoading,
     error,
   };

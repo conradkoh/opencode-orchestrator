@@ -754,6 +754,61 @@ export const subscribeToWorkerMessages = query({
 });
 
 /**
+ * Update the AI model for an active chat session.
+ * Allows users to switch models mid-conversation.
+ *
+ * @param chatSessionId - Session to update
+ * @param model - New AI model to use (e.g., "claude-sonnet-4-5", "gpt-4")
+ */
+export const updateSessionModel = mutation({
+  args: {
+    ...SessionIdArg,
+    chatSessionId: v.string(),
+    model: v.string(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    console.log('[updateSessionModel] Called with:', {
+      chatSessionId: args.chatSessionId,
+      model: args.model,
+    });
+
+    // Verify user is authenticated
+    const user = await getAuthUserOptional(ctx, args);
+    if (!user) {
+      throw new Error('Unauthorized: Must be logged in to update a session');
+    }
+
+    // Find session
+    const session = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
+      .first();
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Verify user owns the session
+    if (session.userId !== user._id) {
+      throw new Error('Unauthorized: You do not own this session');
+    }
+
+    // Verify session is active
+    if (session.status !== 'active') {
+      throw new Error('Cannot update model on inactive session');
+    }
+
+    // Update session model
+    await ctx.db.patch(session._id, {
+      model: args.model,
+      lastActivity: Date.now(),
+    });
+
+    console.log('[updateSessionModel] Model updated successfully');
+  },
+});
+
+/**
  * Update session name from OpenCode.
  * Called by worker during sync to update session names.
  *
