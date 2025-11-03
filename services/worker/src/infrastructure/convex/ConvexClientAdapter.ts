@@ -1,5 +1,6 @@
 import { api } from '@workspace/backend/convex/_generated/api';
 import { ConvexClient, ConvexHttpClient } from 'convex/browser';
+import type { ChatSessionId, OpencodeSessionId } from '../../../../backend/convex/types/sessionIds';
 import type { WorkerConfig } from '../../config';
 
 /**
@@ -10,13 +11,13 @@ export type ConnectCallback = () => Promise<void>;
 /**
  * Callback for new chat sessions.
  */
-export type SessionStartCallback = (sessionId: string, model: string) => Promise<void>;
+export type SessionStartCallback = (chatSessionId: ChatSessionId, model: string) => Promise<void>;
 
 /**
  * Callback for new messages.
  */
 export type MessageCallback = (
-  sessionId: string,
+  chatSessionId: ChatSessionId,
   messageId: string,
   content: string
 ) => Promise<void>;
@@ -265,7 +266,9 @@ export class ConvexClientAdapter {
 
             // Notify callback
             if (this.sessionStartCallback) {
-              this.sessionStartCallback(session.sessionId, session.model).catch((error) => {
+              // Cast to branded type
+              const chatSessionId = session.sessionId as ChatSessionId;
+              this.sessionStartCallback(chatSessionId, session.model).catch((error) => {
                 console.error('❌ Error in session start callback:', error);
               });
             }
@@ -324,8 +327,10 @@ export class ConvexClientAdapter {
                 console.log(`🔄 Reprocessing incomplete message: ${assistantMsg.messageId}`);
 
                 if (this.messageCallback) {
+                  // Cast to branded type
+                  const chatSessionId = assistantMsg.sessionId as ChatSessionId;
                   this.messageCallback(
-                    assistantMsg.sessionId,
+                    chatSessionId,
                     assistantMsg.messageId,
                     userMessage.content
                   ).catch((error) => {
@@ -371,8 +376,10 @@ export class ConvexClientAdapter {
 
             // Notify callback with assistant message ID (where response should be written)
             if (this.messageCallback) {
+              // Cast to branded type
+              const chatSessionId = message.sessionId as ChatSessionId;
               this.messageCallback(
-                message.sessionId,
+                chatSessionId,
                 assistantMessage.messageId,
                 message.content
               ).catch((error) => {
@@ -391,13 +398,13 @@ export class ConvexClientAdapter {
    * Write a chunk of streaming response.
    */
   async writeChunk(
-    sessionId: string,
+    chatSessionId: ChatSessionId,
     messageId: string,
     chunk: string,
     sequence: number
   ): Promise<void> {
     await this.httpClient.mutation(api.chat.writeChunk, {
-      chatSessionId: sessionId,
+      chatSessionId,
       messageId,
       chunk,
       sequence,
@@ -407,20 +414,47 @@ export class ConvexClientAdapter {
   /**
    * Complete a message with full content.
    */
-  async completeMessage(sessionId: string, messageId: string, content: string): Promise<void> {
+  async completeMessage(
+    chatSessionId: ChatSessionId,
+    messageId: string,
+    content: string
+  ): Promise<void> {
     await this.httpClient.mutation(api.chat.completeMessage, {
-      chatSessionId: sessionId,
+      chatSessionId,
       messageId,
       content,
     });
   }
 
   /**
-   * Mark session as ready.
+   * Mark session as ready and store OpenCode session ID.
    */
-  async sessionReady(sessionId: string): Promise<void> {
+  async sessionReady(
+    chatSessionId: ChatSessionId,
+    opencodeSessionId?: OpencodeSessionId
+  ): Promise<void> {
     await this.httpClient.mutation(api.chat.sessionReady, {
-      chatSessionId: sessionId,
+      chatSessionId,
+      opencodeSessionId,
+    });
+  }
+
+  /**
+   * Get all active sessions for this worker (for restoration).
+   */
+  async getActiveSessions(): Promise<
+    Array<{
+      chatSessionId: ChatSessionId;
+      opencodeSessionId?: OpencodeSessionId;
+      workerId: string;
+      model: string;
+      status: string;
+      createdAt: number;
+      lastActivity: number;
+    }>
+  > {
+    return await this.httpClient.query(api.chat.getActiveSessions, {
+      workerId: this.config.workerId,
     });
   }
 

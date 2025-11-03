@@ -3,6 +3,7 @@ import { SessionIdArg } from 'convex-helpers/server/sessions';
 import { nanoid } from 'nanoid';
 import { getAuthUserOptional } from '../modules/auth/getAuthUser';
 import { mutation, query } from './_generated/server';
+import type { ChatSessionId, OpencodeSessionId } from './types/sessionIds';
 
 /**
  * Start a new chat session with a worker.
@@ -10,7 +11,7 @@ import { mutation, query } from './_generated/server';
  *
  * @param workerId - Worker to handle this session
  * @param model - AI model to use (e.g., "claude-sonnet-4-5")
- * @returns sessionId for the new session
+ * @returns chatSessionId for the new session (ChatSessionId branded type)
  */
 export const startSession = mutation({
   args: {
@@ -18,7 +19,7 @@ export const startSession = mutation({
     workerId: v.string(),
     model: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ChatSessionId> => {
     console.log('[startSession] Called with:', { workerId: args.workerId, model: args.model });
 
     // Verify user is authenticated
@@ -54,13 +55,13 @@ export const startSession = mutation({
     }
     console.log('[startSession] Machine ownership verified');
 
-    // Generate session ID
-    const sessionId = nanoid();
-    console.log('[startSession] Generated sessionId:', sessionId);
+    // Generate chat session ID (ChatSessionId branded type)
+    const chatSessionId = nanoid() as ChatSessionId;
+    console.log('[startSession] Generated chatSessionId:', chatSessionId);
 
-    // Create session record
+    // Create session record (opencodeSessionId will be set later by worker)
     await ctx.db.insert('chatSessions', {
-      sessionId,
+      sessionId: chatSessionId,
       workerId: args.workerId,
       userId: user._id,
       model: args.model,
@@ -70,7 +71,7 @@ export const startSession = mutation({
     });
     console.log('[startSession] Session created successfully');
 
-    return sessionId;
+    return chatSessionId;
   },
 });
 
@@ -295,12 +296,15 @@ export const completeMessage = mutation({
 /**
  * Mark a session as ready after worker initialization.
  * Called by worker service when opencode process is ready.
+ * Also stores the OpenCode session ID for session restoration.
  *
- * @param sessionId - Session that is ready
+ * @param chatSessionId - Convex chat session ID
+ * @param opencodeSessionId - OpenCode SDK session ID (optional)
  */
 export const sessionReady = mutation({
   args: {
     chatSessionId: v.string(),
+    opencodeSessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Find session
@@ -313,10 +317,50 @@ export const sessionReady = mutation({
       throw new Error('Session not found');
     }
 
-    // Update session activity (session is already active from creation)
+    // Update session with OpenCode session ID and activity
     await ctx.db.patch(session._id, {
+      opencodeSessionId: args.opencodeSessionId,
       lastActivity: Date.now(),
     });
+
+    console.log(
+      '[sessionReady] Session ready:',
+      args.chatSessionId,
+      'opencodeSessionId:',
+      args.opencodeSessionId
+    );
+  },
+});
+
+/**
+ * Get all active sessions for a worker.
+ * Used by worker for session restoration after restart.
+ *
+ * @param workerId - Worker ID to get active sessions for
+ * @returns Array of active sessions with OpenCode session IDs
+ */
+export const getActiveSessions = query({
+  args: {
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get all active sessions for this worker
+    const sessions = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_worker_and_status', (q) =>
+        q.eq('workerId', args.workerId).eq('status', 'active')
+      )
+      .collect();
+
+    return sessions.map((session) => ({
+      chatSessionId: session.sessionId as ChatSessionId,
+      opencodeSessionId: session.opencodeSessionId as OpencodeSessionId | undefined,
+      workerId: session.workerId,
+      model: session.model,
+      status: session.status,
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+    }));
   },
 });
 
