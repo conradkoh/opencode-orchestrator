@@ -52,27 +52,40 @@ cp env.example .env
 
 ## Usage
 
-### First-Time Setup
+The worker service supports two operating modes:
+
+### Development Mode (Single Worker)
+
+For local development with a single worker:
 
 ```bash
-# Start the worker (will prompt for registration token)
-pnpm start
+# Start in development mode with auto-reload
+pnpm run dev
 ```
 
-1. The worker will detect no token is configured
-2. You'll be prompted to enter the registration token from the webapp
-3. You'll be prompted for the root directory for worker operations
-4. The worker will authenticate and sync state from Convex
+On first run, you'll be prompted to enter:
+- Worker token (from web UI: Machine → ⋮ → "Add Worker")
+- Convex URL (from your Convex dashboard)
 
-### Subsequent Starts
+Configuration is saved to `.env` for future runs.
+
+### Production Mode (Multiple Workers)
+
+For running multiple workers from a centralized configuration:
 
 ```bash
-# Start with stored token
-pnpm start
-
-# Or provide token explicitly
-pnpm start --token mch_abc123:sec_xyz789
+# Start all configured workers
+pnpm run opencode-orchestrator
 ```
+
+On first run, a template configuration will be created at:
+```
+~/.config/opencode-orchestrator/workers.json
+```
+
+Edit this file to add your worker configurations.
+
+📖 **For detailed setup instructions, see [ORCHESTRATOR-SETUP.md](./ORCHESTRATOR-SETUP.md)**
 
 ### Development
 
@@ -105,27 +118,45 @@ pnpm lint:fix
 
 ## Configuration
 
-### Environment Variables
+### Development Mode (.env file)
+
+Create a `.env` file in `services/worker/`:
 
 ```bash
+# Worker authentication token (required)
+# Format: machine_<machine_id>:worker_<worker_id>:secret_<secret>
+WORKER_TOKEN=machine_abc123:worker_xyz789:secret_def456ghi789jkl012
+
 # Convex Backend URL (required)
 CONVEX_URL=https://your-convex-deployment.convex.cloud
-
-# Machine token (alternative to CLI --token flag)
-MACHINE_TOKEN=mch_xxx:sec_yyy
-
-# Root directory for worker operations
-ROOT_DIRECTORY=/path/to/root
-
-# Session idle timeout in milliseconds (default: 300000 = 5 minutes)
-IDLE_TIMEOUT=300000
-
-# State sync interval in milliseconds (default: 30000 = 30 seconds)
-SYNC_INTERVAL=30000
-
-# Local config file path (default: .worker-config.json)
-CONFIG_PATH=.worker-config.json
 ```
+
+The working directory will be the current directory (`process.cwd()`).
+
+### Production Mode (workers.json file)
+
+Create `~/.config/opencode-orchestrator/workers.json`:
+
+```jsonc
+{
+  "workers": [
+    // Main project worker  
+    {
+      "token": "machine_abc123:worker_xyz789:secret_def456ghi789jkl012",
+      "working_directory": "~/Documents/Projects/my-project",  // Required
+      "convex_url": "https://your-deployment.convex.cloud"
+    }
+  ]
+}
+```
+
+**Configuration Notes:**
+- Supports JSONC format (JSON with `//` and `/* */` comments)
+- `working_directory` is **mandatory** for each worker
+- Supports tilde (`~`) expansion and relative paths
+- Each worker can have its own working directory and configuration
+
+📖 **For complete configuration guide, see [ORCHESTRATOR-SETUP.md](./ORCHESTRATOR-SETUP.md)**
 
 ## Project Structure
 

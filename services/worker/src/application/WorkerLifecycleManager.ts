@@ -184,8 +184,8 @@ export class WorkerLifecycleManager implements IWorkerLifecycleManager {
     }
 
     try {
-      // Create chat manager
-      const workingDirectory = process.cwd();
+      // Create chat manager with working directory from config
+      const workingDirectory = this.config.workingDirectory;
       this.chatManager = new ChatSessionManager(this.convexClient, workingDirectory);
 
       // Set up event callbacks

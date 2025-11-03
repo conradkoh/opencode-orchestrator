@@ -53,5 +53,18 @@
       "!**/convex/_generated/**",
       "!**/coverage/**"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/__tests__/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noImplicitAnyLet": "off"
+          }
+        }
+      }
+    }
+  ]
 }

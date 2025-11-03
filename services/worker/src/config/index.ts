@@ -1,7 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import { checkMissingEnvVars, loadEnv, parseWorkerConfig, type WorkerConfig } from './env';
+import { checkMissingEnvVars, loadEnv, parseWorkerConfig } from './env';
+import type { WorkerConfig } from './types';
 
 /**
  * Load worker configuration from environment.
@@ -26,6 +27,16 @@ export async function loadConfig(): Promise<WorkerConfig | null> {
     // Environment validation failed or variables missing
     return null;
   }
+}
+
+/**
+ * Load development configuration from .env file.
+ * This is used when running in development mode with pnpm run dev.
+ *
+ * @returns WorkerConfig if .env is valid, null otherwise
+ */
+export async function loadDevConfig(): Promise<WorkerConfig | null> {
+  return loadConfig();
 }
 
 /**
@@ -134,4 +145,21 @@ CONVEX_URL=${convexUrl}
 }
 
 // Re-export types and functions from env module
-export { getEnv, loadEnv, parseWorkerConfig, type WorkerConfig } from './env';
+export { getEnv, loadEnv, parseWorkerConfig } from './env';
+// Re-export orchestrator functions
+export {
+  expandPath,
+  getConfigDir,
+  getWorkersJsonPath,
+  hasOrchestratorConfig,
+  loadOrchestratorConfig,
+  loadWorkersJson,
+  parseWorkerConfigEntry,
+} from './orchestrator';
+// Re-export shared types
+export type {
+  OrchestratorConfig,
+  WorkerConfig,
+  WorkerConfigEntry,
+  WorkersConfig,
+} from './types';

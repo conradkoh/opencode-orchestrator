@@ -3,9 +3,10 @@ import { validateMachineId, validateWorkerId } from '../valueObjects/Ids';
 import type { ISession } from './Session';
 
 /**
- * Configuration for creating a Worker.
+ * Configuration for creating a Worker entity.
+ * This is for the domain entity, not the service configuration.
  */
-export interface WorkerConfig {
+export interface WorkerEntityConfig {
   /** Unique worker identifier */
   id: string;
   /** Machine ID this worker belongs to */
@@ -71,11 +72,11 @@ export class Worker implements IWorker {
 
   /**
    * Creates a new Worker instance.
-   * @param config - Worker configuration
+   * @param config - Worker entity configuration
    * @returns A new Worker instance
    * @throws Error if configuration is invalid
    */
-  static create(config: WorkerConfig): Worker {
+  static create(config: WorkerEntityConfig): Worker {
     if (!config.directory || typeof config.directory !== 'string') {
       throw new Error('Worker directory must be a non-empty string');
     }

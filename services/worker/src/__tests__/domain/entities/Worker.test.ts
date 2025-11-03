@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Session } from '../../../domain/entities/Session';
-import type { WorkerConfig } from '../../../domain/entities/Worker';
+import type { WorkerEntityConfig } from '../../../domain/entities/Worker';
 import { Worker } from '../../../domain/entities/Worker';
 
 describe('Worker Entity', () => {
   describe('create', () => {
     it('should create a valid worker with all fields', () => {
-      const config: WorkerConfig = {
+      const config: WorkerEntityConfig = {
         id: 'worker_123',
         machineId: 'machine_456',
         directory: '/path/to/project',
@@ -21,7 +21,7 @@ describe('Worker Entity', () => {
     });
 
     it('should throw error for invalid worker ID', () => {
-      const config: WorkerConfig = {
+      const config: WorkerEntityConfig = {
         id: '',
         machineId: 'machine_456',
         directory: '/path/to/project',
@@ -31,7 +31,7 @@ describe('Worker Entity', () => {
     });
 
     it('should throw error for invalid machine ID', () => {
-      const config: WorkerConfig = {
+      const config: WorkerEntityConfig = {
         id: 'worker_123',
         machineId: '',
         directory: '/path/to/project',
@@ -41,7 +41,7 @@ describe('Worker Entity', () => {
     });
 
     it('should throw error for empty directory', () => {
-      const config: WorkerConfig = {
+      const config: WorkerEntityConfig = {
         id: 'worker_123',
         machineId: 'machine_456',
         directory: '',

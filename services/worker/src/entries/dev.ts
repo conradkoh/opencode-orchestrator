@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 
-import { MachineServer } from '@presentation/MachineServer';
-import { interactiveSetup, loadConfig, loadEnv } from './config';
+import { interactiveSetup, loadDevConfig, loadEnv } from '../config';
+import { MachineServer } from '../presentation/MachineServer';
 
 /**
- * Main entry point for the Assistant Worker Runtime.
+ * Main entry point for the Assistant Worker Runtime in Development Mode.
  *
  * This CLI application manages:
  * - Worker registration and authorization
  * - OpenCode session orchestration
  * - Real-time communication with Convex backend
  *
+ * Development Mode (single worker):
+ *   Uses .env file in current directory
+ *   Working directory: process.cwd()
+ *
  * Usage:
- *   pnpm start                    # Start with stored config (or prompt on first run)
+ *   pnpm run dev                  # Start with .env config (or prompt on first run)
  *   pnpm start --help             # Show help
  */
 
@@ -38,17 +42,17 @@ function _parseArgs(): { help: boolean } {
  */
 function _showHelp(): void {
   console.log(`
-Assistant Worker Runtime - OpenCode Orchestrator
+OpenCode Worker - Development Mode
 
 Usage:
-  pnpm start [options]
+  pnpm run dev [options]
 
 Options:
   --help, -h             Show this help message
 
-Environment Variables (required):
+Environment Variables (required in .env file):
   WORKER_TOKEN          Worker authentication token
-                        Format: machine_<machine_id>:worker_<worker_id>
+                        Format: machine_<machine_id>:worker_<worker_id>:secret_<secret>
                         Get this from the web UI by selecting your machine
                         and clicking "Add Worker" in the action menu
 
@@ -60,12 +64,20 @@ First-Time Setup:
   On first run, you will be prompted to enter your worker token and
   Convex URL. These will be saved to a .env file for future runs.
 
+Working Directory:
+  The worker will use the current directory (process.cwd()) as its
+  working directory for file operations.
+
 Examples:
-  # Start (will prompt for config on first run)
-  pnpm start
+  # Start in dev mode (will prompt for config on first run)
+  pnpm run dev
 
   # Show help
-  pnpm start --help
+  pnpm run dev --help
+
+Production Mode:
+  For running multiple workers, use: pnpm run opencode-orchestrator
+  See documentation for configuring ~/.config/opencode-orchestrator/workers.json
 
 For more information, visit:
   https://github.com/your-org/opencode-orchestrator
@@ -83,10 +95,10 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  console.log('🚀 Starting Opencode Worker...\n');
+  console.log('🚀 Starting OpenCode Worker (Development Mode)...\n');
 
-  // Try to load configuration
-  let config = await loadConfig();
+  // Try to load configuration from .env
+  let config = await loadDevConfig();
 
   // If config is missing or invalid, run interactive setup
   if (!config) {
@@ -94,7 +106,7 @@ async function main(): Promise<void> {
       await interactiveSetup();
       // Reload environment after setup
       loadEnv();
-      config = await loadConfig();
+      config = await loadDevConfig();
     } catch (error) {
       console.error('\n❌ Setup failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
@@ -109,6 +121,7 @@ async function main(): Promise<void> {
 
   console.log(`📍 Machine ID: ${config.machineId}`);
   console.log(`🔧 Worker ID: ${config.workerId}`);
+  console.log(`📂 Working Directory: ${config.workingDirectory}`);
   console.log(`🌐 Convex URL: ${config.convexUrl}\n`);
 
   const server = new MachineServer();

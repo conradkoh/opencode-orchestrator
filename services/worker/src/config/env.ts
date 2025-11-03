@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv';
 import { z } from 'zod';
+import type { WorkerConfig } from './types';
 
 /**
  * Environment variable schema definition.
@@ -36,22 +37,6 @@ const envSchema = z.object({
  * Inferred from the Zod schema to ensure type safety.
  */
 export type Env = z.infer<typeof envSchema>;
-
-/**
- * Parsed worker configuration derived from environment variables.
- */
-export interface WorkerConfig {
-  /** Machine ID extracted from worker token */
-  machineId: string;
-  /** Worker ID extracted from worker token */
-  workerId: string;
-  /** Cryptographic secret extracted from worker token */
-  secret: string;
-  /** Convex backend URL */
-  convexUrl: string;
-  /** Original worker token */
-  workerToken: string;
-}
 
 /**
  * Singleton instance of validated environment variables.
@@ -132,6 +117,7 @@ export function getEnv(): Env {
  * Extracts machine ID, worker ID, and secret from the worker token.
  *
  * @param env - Validated environment variables
+ * @param workingDirectory - Optional working directory (defaults to process.cwd())
  * @returns Parsed worker configuration
  *
  * @example
@@ -141,7 +127,7 @@ export function getEnv(): Env {
  * console.log(`Machine: ${config.machineId}, Worker: ${config.workerId}`);
  * ```
  */
-export function parseWorkerConfig(env: Env): WorkerConfig {
+export function parseWorkerConfig(env: Env, workingDirectory?: string): WorkerConfig {
   // Token format: machine_<machine_id>:worker_<worker_id>:secret_<secret>
   const [machinePart, workerPart, secretPart] = env.WORKER_TOKEN.split(':');
 
@@ -155,6 +141,7 @@ export function parseWorkerConfig(env: Env): WorkerConfig {
     secret,
     convexUrl: env.CONVEX_URL,
     workerToken: env.WORKER_TOKEN,
+    workingDirectory: workingDirectory || process.cwd(),
   };
 }
 

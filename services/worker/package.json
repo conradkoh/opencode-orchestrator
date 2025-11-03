@@ -5,8 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "bun run src/index.ts",
-    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/entries/dev.ts",
+    "dev": "bun --watch src/entries/dev.ts",
+    "opencode-orchestrator": "bun run src/entries/orchestrator.ts",
     "build": "tsc",
     "test": "vitest",
     "test:unit": "vitest run src/__tests__/domain src/__tests__/application",
