@@ -86,6 +86,17 @@ export function ChatInterface() {
     });
   }, [selectedMachineId, selectedWorkerId, urlChatSessionId, session, messages.length]);
 
+  // Auto-close session when it's terminated (e.g. worker went offline)
+  useEffect(() => {
+    if (session?.status === 'terminated' && urlChatSessionId) {
+      console.log('[ChatInterface] Session terminated, clearing from URL');
+      // Clear terminated session from URL after a brief delay to show the state
+      setTimeout(() => {
+        urlActions.setChatSessionId(null);
+      }, 1000);
+    }
+  }, [session?.status, urlChatSessionId, urlActions]);
+
   // Request worker connection when worker is selected
   // This is a side effect (network request), not state synchronization
   // biome-ignore lint/correctness/useExhaustiveDependencies: connectWorker reference changes on every render, but we only want to trigger when workerId changes
