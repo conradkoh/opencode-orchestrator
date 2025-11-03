@@ -3,6 +3,7 @@ import type { IOpencodeInstance } from '../domain/interfaces/IOpencodeClient';
 import { validateSessionId } from '../domain/valueObjects/Ids';
 import type { ConvexClientAdapter } from '../infrastructure/convex/ConvexClientAdapter';
 import { OpencodeClientAdapter } from '../infrastructure/opencode/OpencodeClientAdapter';
+import { executeSync, type SyncDependencies } from './OpencodeConvexSync';
 
 /**
  * Manages chat session lifecycle and opencode process management.
