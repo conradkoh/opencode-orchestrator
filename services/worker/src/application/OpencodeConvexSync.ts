@@ -60,7 +60,7 @@ export function calculateSyncPlan(
   // Build lookup maps for efficient searching
   const opencodeById = new Map(opencodeSessions.map((s) => [s.id, s]));
   const convexByOpencodeId = new Map(
-    convexSessions.filter((s) => s.opencodeSessionId).map((s) => [s.opencodeSessionId!, s])
+    convexSessions.filter((s) => s.opencodeSessionId).map((s) => [s.opencodeSessionId as string, s])
   );
 
   // 1. Find name updates: sessions exist in both, but names differ
