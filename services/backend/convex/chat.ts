@@ -695,3 +695,138 @@ export const subscribeToWorkerMessages = query({
     }));
   },
 });
+
+/**
+ * Update session name from OpenCode.
+ * Called by worker during sync to update session names.
+ *
+ * @param chatSessionId - Convex chat session ID
+ * @param name - Session name/title from OpenCode
+ */
+export const updateSessionName = mutation({
+  args: {
+    chatSessionId: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
+      .first();
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    await ctx.db.patch(session._id, {
+      name: args.name,
+      lastActivity: Date.now(),
+    });
+  },
+});
+
+/**
+ * Mark session as soft-deleted (deleted from OpenCode).
+ * Preserves session history in Convex for reference.
+ *
+ * @param chatSessionId - Convex chat session ID
+ */
+export const markSessionDeletedInOpencode = mutation({
+  args: {
+    chatSessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
+      .first();
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    await ctx.db.patch(session._id, {
+      deletedAt: Date.now(),
+      deletedInOpencode: true,
+      status: 'terminated',
+    });
+
+    console.log('[markSessionDeletedInOpencode] Session marked as deleted:', args.chatSessionId);
+  },
+});
+
+/**
+ * Create a session synced from OpenCode.
+ * Called when worker detects a session created directly in OpenCode.
+ *
+ * @param opencodeSessionId - OpenCode session ID
+ * @param workerId - Worker ID
+ * @param model - AI model
+ * @param name - Session name/title
+ * @returns Created chat session ID
+ */
+export const createSyncedSession = mutation({
+  args: {
+    opencodeSessionId: v.string(),
+    workerId: v.string(),
+    model: v.string(),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<ChatSessionId> => {
+    // Get worker to find user
+    const worker = await ctx.db
+      .query('workers')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .first();
+
+    if (!worker) {
+      throw new Error('Worker not found');
+    }
+
+    // Get machine to find user
+    const machine = await ctx.db
+      .query('machines')
+      .withIndex('by_machine_id', (q) => q.eq('machineId', worker.machineId))
+      .first();
+
+    if (!machine) {
+      throw new Error('Machine not found');
+    }
+
+    // Check if session already exists
+    const existing = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_opencode_session_id', (q) => q.eq('opencodeSessionId', args.opencodeSessionId))
+      .first();
+
+    if (existing) {
+      console.log('[createSyncedSession] Session already exists:', existing.sessionId);
+      return existing.sessionId as ChatSessionId;
+    }
+
+    // Generate chat session ID
+    const chatSessionId = nanoid() as ChatSessionId;
+
+    await ctx.db.insert('chatSessions', {
+      sessionId: chatSessionId,
+      opencodeSessionId: args.opencodeSessionId,
+      name: args.name,
+      workerId: args.workerId,
+      userId: machine.userId,
+      model: args.model,
+      status: 'active',
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      syncedFromOpencode: true,
+    });
+
+    console.log(
+      '[createSyncedSession] Created synced session:',
+      chatSessionId,
+      'from OpenCode:',
+      args.opencodeSessionId
+    );
+
+    return chatSessionId;
+  },
+});

@@ -19,6 +19,8 @@ export interface IOpencodeInstance {
 export interface OpencodeSessionInfo {
   /** Session identifier from OpenCode */
   id: string;
+  /** Session title/name */
+  title?: string;
   /** Project ID */
   projectID: string;
   /** Working directory */

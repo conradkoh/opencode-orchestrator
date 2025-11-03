@@ -201,6 +201,7 @@ export class OpencodeClientAdapter implements IOpencodeClient {
 
       return {
         id: result.data.id,
+        title: result.data.title,
         projectID: result.data.projectID,
         directory: result.data.directory,
         parentID: result.data.parentID,
@@ -238,6 +239,7 @@ export class OpencodeClientAdapter implements IOpencodeClient {
 
       return result.data.map((session) => ({
         id: session.id,
+        title: session.title,
         projectID: session.projectID,
         directory: session.directory,
         parentID: session.parentID,
@@ -277,6 +279,7 @@ export class OpencodeClientAdapter implements IOpencodeClient {
 
       return {
         id: result.data.id,
+        title: result.data.title,
         projectID: result.data.projectID,
         directory: result.data.directory,
         parentID: result.data.parentID,

@@ -19,6 +19,8 @@ export class ChatSessionManager {
   private opencodeClient: IOpencodeInstance | null = null;
   private activeSessions: Map<ChatSessionId, SessionInfo> = new Map();
   private workingDirectory: string;
+  private syncInterval: NodeJS.Timeout | null = null;
+  private readonly SYNC_INTERVAL_MS = 30000; // 30 seconds
 
   constructor(convexClient: ConvexClientAdapter, workingDirectory: string) {
     this.convexClient = convexClient;
@@ -30,7 +32,7 @@ export class ChatSessionManager {
    * Connect and initialize opencode client.
    * This should be called when a worker is selected in the UI.
    * Initializes the opencode client, fetches available models, and publishes them to Convex.
-   * Also restores any active sessions from Convex.
+   * Also restores any active sessions from Convex and syncs with OpenCode.
    *
    * @returns Promise that resolves when connection is complete
    */
@@ -67,6 +69,12 @@ export class ChatSessionManager {
 
       // Restore any active sessions
       await this.restoreActiveSessions();
+
+      // Sync sessions with OpenCode
+      await this.syncSessionsWithOpencode();
+
+      // Start periodic sync (every 30 seconds)
+      this.startPeriodicSync();
     } catch (error) {
       console.error('❌ Failed to fetch/publish models:', error);
       throw error; // Fail connection if we can't get models
@@ -271,11 +279,17 @@ export class ChatSessionManager {
         }
       }
 
-      // Restore each session
+      // Restore each session (skip soft-deleted ones)
       for (const convexSession of convexSessions) {
         try {
           const chatSessionId = convexSession.chatSessionId;
           const storedOpencodeSessionId = convexSession.opencodeSessionId;
+
+          // Skip soft-deleted sessions
+          if ((convexSession as any).deletedInOpencode) {
+            console.log(`⏭️  Skipping soft-deleted session ${chatSessionId}`);
+            continue;
+          }
 
           // Strategy 1: Use stored OpenCode session ID if available
           if (
@@ -342,11 +356,155 @@ export class ChatSessionManager {
   }
 
   /**
+   * Start periodic session synchronization with OpenCode.
+   */
+  private startPeriodicSync(): void {
+    if (this.syncInterval) {
+      return; // Already running
+    }
+
+    console.log('🔄 Starting periodic session sync...');
+    this.syncInterval = setInterval(async () => {
+      try {
+        await this.syncSessionsWithOpencode();
+      } catch (error) {
+        console.error(
+          '❌ Periodic sync failed:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }, this.SYNC_INTERVAL_MS);
+  }
+
+  /**
+   * Stop periodic session synchronization.
+   */
+  private stopPeriodicSync(): void {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+      console.log('✅ Periodic sync stopped');
+    }
+  }
+
+  /**
+   * Sync sessions between Convex and OpenCode.
+   * - Updates session names from OpenCode
+   * - Marks deleted sessions as soft-deleted
+   * - Syncs new OpenCode sessions to Convex
+   */
+  private async syncSessionsWithOpencode(): Promise<void> {
+    if (!this.opencodeClient) {
+      console.warn('⚠️  Cannot sync: OpenCode client not initialized');
+      return;
+    }
+
+    try {
+      console.log('🔄 Syncing sessions with OpenCode...');
+
+      // Get all OpenCode sessions
+      const opencodeSessions = await this.opencodeAdapter.listSessions(this.opencodeClient);
+      const opencodeSessionIds = new Set(opencodeSessions.map((s) => s.id));
+
+      // Get all Convex sessions for this worker
+      const convexSessions = await this.convexClient.getActiveSessions();
+
+      // 1. Update session names from OpenCode
+      for (const ocSession of opencodeSessions) {
+        const convexSession = convexSessions.find((cs) => cs.opencodeSessionId === ocSession.id);
+
+        if (convexSession && ocSession.title && convexSession.chatSessionId) {
+          try {
+            await this.convexClient.updateSessionName(convexSession.chatSessionId, ocSession.title);
+            console.log(
+              `📝 Updated name for session ${convexSession.chatSessionId}: "${ocSession.title}"`
+            );
+          } catch (error) {
+            console.warn(`⚠️  Failed to update name for ${convexSession.chatSessionId}:`, error);
+          }
+        }
+      }
+
+      // 2. Mark deleted sessions (exist in Convex but not in OpenCode)
+      for (const convexSession of convexSessions) {
+        if (
+          convexSession.opencodeSessionId &&
+          !opencodeSessionIds.has(convexSession.opencodeSessionId)
+        ) {
+          try {
+            await this.convexClient.markSessionDeletedInOpencode(convexSession.chatSessionId);
+            console.log(
+              `🗑️  Marked session ${convexSession.chatSessionId} as deleted (removed from OpenCode)`
+            );
+
+            // Remove from active sessions in memory
+            this.activeSessions.delete(convexSession.chatSessionId);
+          } catch (error) {
+            console.warn(`⚠️  Failed to mark ${convexSession.chatSessionId} as deleted:`, error);
+          }
+        }
+      }
+
+      // 3. Sync new sessions created directly in OpenCode
+      const convexOpencodeIds = new Set(
+        convexSessions.map((cs) => cs.opencodeSessionId as string).filter(Boolean)
+      );
+
+      for (const ocSession of opencodeSessions) {
+        if (!convexOpencodeIds.has(ocSession.id as string)) {
+          try {
+            // This is a new session created directly in OpenCode
+            console.log(
+              `🆕 Found new OpenCode session: ${ocSession.id} "${ocSession.title || '(unnamed)'}"`
+            );
+
+            // Try to infer model from session (default to first available model if not determinable)
+            const models = await this.opencodeAdapter.listModels(this.opencodeClient);
+            const defaultModel = models.length > 0 ? models[0].id : 'unknown';
+
+            const chatSessionId = await this.convexClient.createSyncedSession(
+              ocSession.id as OpencodeSessionId,
+              defaultModel,
+              ocSession.title
+            );
+
+            // Add to active sessions
+            this.activeSessions.set(chatSessionId, {
+              chatSessionId,
+              opencodeSessionId: ocSession.id as OpencodeSessionId,
+              model: defaultModel,
+              startedAt: Date.now(),
+              isInitializing: false,
+            });
+
+            console.log(`✅ Synced new session ${chatSessionId} from OpenCode`);
+
+            // TODO: Sync message history for this session
+            // await this.syncMessageHistory(chatSessionId, ocSession.id);
+          } catch (error) {
+            console.error(`❌ Failed to sync OpenCode session ${ocSession.id}:`, error);
+          }
+        }
+      }
+
+      console.log('✅ Session sync complete');
+    } catch (error) {
+      console.error(
+        '❌ Failed to sync sessions:',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  /**
    * Disconnect all active sessions and cleanup resources.
    * Called during graceful shutdown.
    */
   async disconnectAll(): Promise<void> {
     console.log(`🔌 Disconnecting ${this.activeSessions.size} active session(s)...`);
+
+    // Stop periodic sync
+    this.stopPeriodicSync();
 
     // Close all active sessions
     const sessionIds = Array.from(this.activeSessions.keys());

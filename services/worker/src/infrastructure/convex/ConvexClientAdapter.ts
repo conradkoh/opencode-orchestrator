@@ -481,4 +481,39 @@ export class ConvexClientAdapter {
       secret: this.config.secret,
     });
   }
+
+  /**
+   * Update session name from OpenCode.
+   */
+  async updateSessionName(chatSessionId: ChatSessionId, name: string): Promise<void> {
+    await this.httpClient.mutation(api.chat.updateSessionName, {
+      chatSessionId,
+      name,
+    });
+  }
+
+  /**
+   * Mark session as soft-deleted (deleted from OpenCode).
+   */
+  async markSessionDeletedInOpencode(chatSessionId: ChatSessionId): Promise<void> {
+    await this.httpClient.mutation(api.chat.markSessionDeletedInOpencode, {
+      chatSessionId,
+    });
+  }
+
+  /**
+   * Create a session synced from OpenCode.
+   */
+  async createSyncedSession(
+    opencodeSessionId: OpencodeSessionId,
+    model: string,
+    name?: string
+  ): Promise<ChatSessionId> {
+    return await this.httpClient.mutation(api.chat.createSyncedSession, {
+      opencodeSessionId: opencodeSessionId as string, // Cast branded type to string for Convex mutation
+      workerId: this.config.workerId,
+      model,
+      name,
+    });
+  }
 }
