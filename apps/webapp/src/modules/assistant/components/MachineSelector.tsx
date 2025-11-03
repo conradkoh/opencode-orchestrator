@@ -1,18 +1,7 @@
 'use client';
 
-import { MoreVerticalIcon, PlusIcon, ServerIcon, SettingsIcon } from 'lucide-react';
-import Link from 'next/link';
-import { useState } from 'react';
+import { ServerIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -20,11 +9,9 @@ import {
   SelectItem,
   SelectLabel,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select';
 import type { Machine } from '../types';
-import { CreateMachineDialog } from './CreateMachineDialog';
-import { CreateWorkerDialog } from './CreateWorkerDialog';
+import { MachineActionMenu } from './MachineActionMenu';
 
 /**
  * Props for MachineSelector component.
@@ -61,8 +48,6 @@ export function MachineSelector({
   disabled,
 }: MachineSelectorProps) {
   const selectedMachine = machines.find((m) => m.machineId === selectedMachineId);
-  const [showCreateMachineDialog, setShowCreateMachineDialog] = useState(false);
-  const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
 
   return (
     <>
@@ -165,50 +150,8 @@ export function MachineSelector({
             </SelectContent>
           </Select>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="shrink-0" title="Machine actions">
-              <MoreVerticalIcon className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Machines</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setShowCreateMachineDialog(true)}>
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Create Machine
-            </DropdownMenuItem>
-            {selectedMachine && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>This Machine</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => setShowCreateWorkerDialog(true)}>
-                  <PlusIcon className="h-4 w-4 mr-2" />
-                  Add Worker
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/app/machine/${selectedMachine.machineId}/settings`}>
-                    <SettingsIcon className="h-4 w-4 mr-2" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <MachineActionMenu selectedMachine={selectedMachine || null} />
       </div>
-
-      <CreateMachineDialog
-        open={showCreateMachineDialog}
-        onOpenChange={setShowCreateMachineDialog}
-      />
-
-      {selectedMachine && (
-        <CreateWorkerDialog
-          machineId={selectedMachine.machineId}
-          open={showCreateWorkerDialog}
-          onOpenChange={setShowCreateWorkerDialog}
-        />
-      )}
     </>
   );
 }
