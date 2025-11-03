@@ -441,8 +441,9 @@ export class ConvexClientAdapter {
 
   /**
    * Get all active sessions for this worker (for restoration).
+   * Optionally filter by timestamp for incremental sync.
    */
-  async getActiveSessions(): Promise<
+  async getActiveSessions(sinceTimestamp?: number): Promise<
     Array<{
       chatSessionId: ChatSessionId;
       opencodeSessionId?: OpencodeSessionId;
@@ -451,10 +452,31 @@ export class ConvexClientAdapter {
       status: string;
       createdAt: number;
       lastActivity: number;
+      deletedInOpencode?: boolean;
     }>
   > {
     return await this.httpClient.query(api.chat.getActiveSessions, {
       workerId: this.config.workerId,
+      sinceTimestamp,
+    });
+  }
+
+  /**
+   * Get last sync timestamp for incremental syncing.
+   */
+  async getLastSyncTimestamp(): Promise<number | null> {
+    return await this.httpClient.query(api.chat.getLastSyncTimestamp, {
+      workerId: this.config.workerId,
+    });
+  }
+
+  /**
+   * Update last sync timestamp after successful sync.
+   */
+  async updateLastSyncTimestamp(timestamp: number): Promise<void> {
+    await this.httpClient.mutation(api.chat.updateLastSyncTimestamp, {
+      workerId: this.config.workerId,
+      timestamp,
     });
   }
 

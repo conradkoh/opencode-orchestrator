@@ -294,6 +294,15 @@ export default defineSchema({
   }).index('by_worker_id', ['workerId']),
 
   /**
+   * Sync state for worker session synchronization.
+   * Tracks last successful sync time to enable incremental syncing.
+   */
+  workerSyncState: defineTable({
+    workerId: v.string(), // Worker ID
+    lastSyncedAt: v.number(), // Timestamp of last successful session sync
+  }).index('by_worker_id', ['workerId']),
+
+  /**
    * Chat sessions for worker conversations.
    * Each session represents a conversation with an AI model on a specific worker.
    * Sessions can be active, idle (resumable), or terminated.

@@ -337,20 +337,27 @@ export const sessionReady = mutation({
  * Used by worker for session restoration after restart.
  *
  * @param workerId - Worker ID to get active sessions for
+ * @param sinceTimestamp - Optional timestamp to get only sessions modified since this time
  * @returns Array of active sessions with OpenCode session IDs
  */
 export const getActiveSessions = query({
   args: {
     workerId: v.string(),
+    sinceTimestamp: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Get all active sessions for this worker
-    const sessions = await ctx.db
+    let sessions = await ctx.db
       .query('chatSessions')
       .withIndex('by_worker_and_status', (q) =>
         q.eq('workerId', args.workerId).eq('status', 'active')
       )
       .collect();
+
+    // Filter by timestamp if provided (incremental sync)
+    if (args.sinceTimestamp) {
+      sessions = sessions.filter((s) => s.lastActivity > args.sinceTimestamp!);
+    }
 
     return sessions.map((session) => ({
       chatSessionId: session.sessionId as ChatSessionId,
@@ -360,7 +367,60 @@ export const getActiveSessions = query({
       status: session.status,
       createdAt: session.createdAt,
       lastActivity: session.lastActivity,
+      deletedInOpencode: session.deletedInOpencode,
     }));
+  },
+});
+
+/**
+ * Get last sync timestamp for a worker.
+ * Used to enable incremental syncing.
+ *
+ * @param workerId - Worker ID
+ * @returns Last sync timestamp or null if never synced
+ */
+export const getLastSyncTimestamp = query({
+  args: {
+    workerId: v.string(),
+  },
+  handler: async (ctx, args): Promise<number | null> => {
+    const syncState = await ctx.db
+      .query('workerSyncState')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .first();
+
+    return syncState?.lastSyncedAt ?? null;
+  },
+});
+
+/**
+ * Update last sync timestamp for a worker.
+ * Called after successful sync completion.
+ *
+ * @param workerId - Worker ID
+ * @param timestamp - Sync completion timestamp
+ */
+export const updateLastSyncTimestamp = mutation({
+  args: {
+    workerId: v.string(),
+    timestamp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('workerSyncState')
+      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        lastSyncedAt: args.timestamp,
+      });
+    } else {
+      await ctx.db.insert('workerSyncState', {
+        workerId: args.workerId,
+        lastSyncedAt: args.timestamp,
+      });
+    }
   },
 });
 
