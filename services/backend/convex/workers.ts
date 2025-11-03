@@ -567,7 +567,13 @@ export const requestConnect = mutation({
     }
 
     if (worker.status !== 'online') {
-      throw new Error('Worker is not online');
+      // Return error info instead of throwing to allow graceful UI handling
+      return {
+        success: false,
+        workerId: args.workerId,
+        error: 'WORKER_OFFLINE',
+        message: 'Worker is not online. Please ensure the worker is running.',
+      };
     }
 
     // Set connect request timestamp
@@ -636,7 +642,7 @@ export const markConnected = mutation({
     let invalidatedCount = 0;
     for (const session of activeSessions) {
       await ctx.db.patch(session._id, {
-        status: 'idle',
+        status: 'inactive',
         opencodeSessionId: undefined, // Clear the old OpenCode session ID
       });
       invalidatedCount++;

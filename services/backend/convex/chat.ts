@@ -813,7 +813,7 @@ export const markSessionDeletedInOpencode = mutation({
     await ctx.db.patch(session._id, {
       deletedAt: Date.now(),
       deletedInOpencode: true,
-      status: 'terminated',
+      status: 'inactive',
     });
 
     console.log('[markSessionDeletedInOpencode] Session marked as deleted:', args.chatSessionId);

@@ -2,8 +2,16 @@
 
 import { api } from '@workspace/backend/convex/_generated/api';
 import { useSessionMutation } from 'convex-helpers/react/sessions';
-import { FolderIcon, PlusIcon, ServerIcon, XIcon } from 'lucide-react';
+import {
+  AlertCircleIcon,
+  FolderIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  ServerIcon,
+  XIcon,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAppUrlState } from '../hooks/useAppUrlState';
@@ -57,7 +65,7 @@ export function ChatInterface() {
   // Track when we need to focus the input after state changes
   const [shouldFocusInput, setShouldFocusInput] = useState(false);
 
-  const { connectWorker } = useConnectWorker();
+  const { connectWorker, connectionError, isConnecting, clearError } = useConnectWorker();
 
   const selectedWorker = useMemo(
     () => workers?.find((w) => w.workerId === selectedWorkerId),
@@ -102,9 +110,13 @@ export function ChatInterface() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: connectWorker reference changes on every render, but we only want to trigger when workerId changes
   useEffect(() => {
     if (selectedWorkerId) {
+      // Clear any previous errors when selecting a new worker
+      clearError();
       // Request worker to connect and initialize opencode
-      connectWorker(selectedWorkerId).catch((error) => {
-        console.error('[ChatInterface] Failed to connect worker:', error);
+      connectWorker(selectedWorkerId).then((result) => {
+        if (!result.success) {
+          console.warn('[ChatInterface] Worker connection failed:', result.error);
+        }
       });
     }
   }, [selectedWorkerId]);
@@ -291,6 +303,20 @@ export function ChatInterface() {
     setSelectedModel(model);
   }, []);
 
+  /**
+   * Handles retrying worker connection
+   */
+  const handleRetryConnection = useCallback(() => {
+    if (selectedWorkerId) {
+      clearError();
+      connectWorker(selectedWorkerId).then((result) => {
+        if (!result.success) {
+          console.warn('[ChatInterface] Worker connection retry failed:', result.error);
+        }
+      });
+    }
+  }, [selectedWorkerId, connectWorker, clearError]);
+
   return (
     <div className="flex h-full flex-col gap-4">
       {/* Machine and Assistant Selection */}
@@ -344,17 +370,32 @@ export function ChatInterface() {
                 {selectedWorker && !session && (
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Badge
-                      variant={selectedWorker.status === 'online' ? 'default' : 'secondary'}
+                      variant={
+                        isConnecting
+                          ? 'outline'
+                          : selectedWorker.status === 'online'
+                            ? 'default'
+                            : 'secondary'
+                      }
                       className="gap-1.5"
                     >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          selectedWorker.status === 'online'
-                            ? 'bg-green-500 dark:bg-green-400'
-                            : 'bg-gray-400 dark:bg-gray-500'
-                        }`}
-                      />
-                      {selectedWorker.status === 'online' ? 'Online' : 'Offline'}
+                      {isConnecting ? (
+                        <>
+                          <RefreshCwIcon className="h-3 w-3 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              selectedWorker.status === 'online'
+                                ? 'bg-green-500 dark:bg-green-400'
+                                : 'bg-gray-400 dark:bg-gray-500'
+                            }`}
+                          />
+                          {selectedWorker.status === 'online' ? 'Online' : 'Offline'}
+                        </>
+                      )}
                     </Badge>
                     <span className="text-muted-foreground font-mono">
                       {selectedWorker.name || `Worker ${selectedWorker.workerId.slice(0, 8)}`}
@@ -377,6 +418,51 @@ export function ChatInterface() {
           </div>
         )}
       </div>
+
+      {/* Connection Error Alert */}
+      {connectionError && selectedWorkerId && (
+        <Alert variant="destructive" className="border-red-200 dark:border-red-800">
+          <AlertCircleIcon className="h-4 w-4" />
+          <AlertTitle>Worker Connection Failed</AlertTitle>
+          <AlertDescription className="flex flex-col gap-3">
+            <div className="text-sm">
+              {connectionError.code === 'WORKER_OFFLINE' ? (
+                <div className="space-y-2">
+                  <p>
+                    The selected worker is currently offline. Please ensure the worker process is
+                    running on the target machine.
+                  </p>
+                  <div className="mt-3 p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50">
+                    <p className="text-xs font-medium text-red-900 dark:text-red-200 mb-1">
+                      To start the worker:
+                    </p>
+                    <code className="text-xs text-red-800 dark:text-red-300 block font-mono bg-red-100 dark:bg-red-900/30 p-2 rounded mt-1">
+                      pnpm nx run worker:start
+                    </code>
+                  </div>
+                </div>
+              ) : (
+                <p>{connectionError.message}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetryConnection}
+                disabled={isConnecting}
+                className="gap-2"
+              >
+                <RefreshCwIcon className={`h-3 w-3 ${isConnecting ? 'animate-spin' : ''}`} />
+                {isConnecting ? 'Retrying...' : 'Retry Connection'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearError}>
+                Dismiss
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Chat Area or Session List */}
       {session ? (

@@ -155,8 +155,8 @@ export class ConvexClientAdapter {
         secret: this.config.secret,
       });
 
-      if (result.sessionsTerminated > 0) {
-        console.log(`✅ Terminated ${result.sessionsTerminated} active session(s)`);
+      if (result.sessionsInactivated && result.sessionsInactivated > 0) {
+        console.log(`✅ Inactivated ${result.sessionsInactivated} active session(s)`);
       }
     } catch (error) {
       console.error(
