@@ -26,7 +26,6 @@ import {
 import { useDeleteMachine } from '../hooks/useDeleteMachine';
 import type { Machine } from '../types';
 import { CreateMachineDialog } from './CreateMachineDialog';
-import { CreateWorkerDialog } from './CreateWorkerDialog';
 
 /**
  * Props for MachineActionMenu component.
@@ -38,7 +37,7 @@ export interface MachineActionMenuProps {
 
 /**
  * Action menu component for machine management.
- * Provides actions for creating machines, adding workers, accessing settings, and deleting machines.
+ * Provides actions for creating machines, accessing settings, and deleting machines.
  *
  * @example
  * ```typescript
@@ -48,7 +47,6 @@ export interface MachineActionMenuProps {
 export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
   const router = useRouter();
   const [showCreateMachineDialog, setShowCreateMachineDialog] = useState(false);
-  const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const { deleteMachine, isDeleting } = useDeleteMachine();
 
@@ -94,10 +92,6 @@ export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>This Machine</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setShowCreateWorkerDialog(true)}>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Worker
-              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/app/machine/${selectedMachine.machineId}/settings`}>
                   <SettingsIcon className="h-4 w-4 mr-2" />
@@ -123,34 +117,27 @@ export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
       />
 
       {selectedMachine && (
-        <>
-          <CreateWorkerDialog
-            machineId={selectedMachine.machineId}
-            open={showCreateWorkerDialog}
-            onOpenChange={setShowCreateWorkerDialog}
-          />
-          <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Machine</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{selectedMachine.name}"? This will remove the
-                  machine and all its workers. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteConfirm}
-                  disabled={isDeleting}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Machine'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </>
+        <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Machine</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{selectedMachine.name}"? This will remove the
+                machine and all its workers. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Machine'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </>
   );
