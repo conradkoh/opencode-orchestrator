@@ -72,9 +72,6 @@ export class ChatSessionManager {
       await this.convexClient.markConnected();
       console.log('✅ Worker marked as connected');
 
-      // Restore any active sessions
-      await this.restoreActiveSessions();
-
       // Sync sessions with OpenCode
       await this.syncSessionsWithOpencode();
 
@@ -256,118 +253,6 @@ export class ChatSessionManager {
   }
 
   /**
-   * Restore active sessions from Convex after worker restart.
-   * Attempts to match existing OpenCode sessions or creates new ones.
-   * Limited to 50 most recent sessions for performance.
-   */
-  private async restoreActiveSessions(): Promise<void> {
-    const MAX_SESSIONS_TO_RESTORE = 50;
-
-    try {
-      console.log('🔄 Restoring active sessions from Convex...');
-
-      // Get active sessions from Convex
-      const allConvexSessions = await this.convexClient.getActiveSessions();
-
-      if (allConvexSessions.length === 0) {
-        console.log('✅ No active sessions to restore');
-        return;
-      }
-
-      console.log(`📋 Found ${allConvexSessions.length} active session(s) in database`);
-
-      // Sort by last activity (most recent first) and limit
-      const convexSessions = allConvexSessions
-        .filter((s) => !(s as any).deletedInOpencode) // Filter deleted first
-        .sort((a, b) => b.lastActivity - a.lastActivity)
-        .slice(0, MAX_SESSIONS_TO_RESTORE);
-
-      if (convexSessions.length < allConvexSessions.length) {
-        console.log(
-          `📋 Restoring ${convexSessions.length} most recent sessions (limit: ${MAX_SESSIONS_TO_RESTORE})`
-        );
-        console.log(
-          `ℹ️  ${allConvexSessions.length - convexSessions.length} older sessions will be loaded on-demand if needed`
-        );
-      } else {
-        console.log(`📋 Restoring all ${convexSessions.length} session(s)`);
-      }
-
-      // List existing OpenCode sessions (if any)
-      let opencodeSessions: Array<{ id: string }> = [];
-      if (this.opencodeClient) {
-        try {
-          opencodeSessions = await this.opencodeAdapter.listSessions(this.opencodeClient);
-          console.log(`📋 Found ${opencodeSessions.length} existing OpenCode session(s)`);
-        } catch (error) {
-          console.warn('⚠️  Failed to list OpenCode sessions:', error);
-        }
-      }
-
-      // Restore each session
-      for (const convexSession of convexSessions) {
-        try {
-          const chatSessionId = convexSession.chatSessionId;
-          const storedOpencodeSessionId = convexSession.opencodeSessionId;
-
-          // Strategy 1: Use stored OpenCode session ID if available
-          if (
-            storedOpencodeSessionId &&
-            opencodeSessions.some((s) => s.id === storedOpencodeSessionId)
-          ) {
-            console.log(
-              `✅ Restoring session ${chatSessionId} with existing OpenCode session ${storedOpencodeSessionId}`
-            );
-            this.activeSessions.set(chatSessionId, {
-              chatSessionId,
-              opencodeSessionId: storedOpencodeSessionId,
-              model: convexSession.model,
-              startedAt: convexSession.createdAt,
-              isInitializing: false,
-            });
-          }
-          // Strategy 2: Create new OpenCode session
-          else {
-            console.log(
-              `🆕 Creating new OpenCode session for ${chatSessionId} (previous session not found)`
-            );
-
-            if (!this.opencodeClient) {
-              console.error('❌ Cannot create OpenCode session: client not initialized');
-              continue;
-            }
-
-            const opencodeSession = await this.opencodeAdapter.createSession(
-              this.opencodeClient,
-              convexSession.model
-            );
-            const opencodeSessionId = opencodeSession.id as OpencodeSessionId;
-
-            this.activeSessions.set(chatSessionId, {
-              chatSessionId,
-              opencodeSessionId,
-              model: convexSession.model,
-              startedAt: convexSession.createdAt,
-              isInitializing: false,
-            });
-
-            // Update Convex with new OpenCode session ID
-            await this.convexClient.sessionReady(chatSessionId, opencodeSessionId);
-            console.log(`✅ New OpenCode session created: ${opencodeSessionId}`);
-          }
-        } catch (error) {
-          console.error(`❌ Failed to restore session ${convexSession.chatSessionId}:`, error);
-        }
-      }
-
-      console.log(`✅ Restored ${this.activeSessions.size} session(s)`);
-    } catch (error) {
-      console.error('❌ Failed to restore sessions:', error);
-      // Don't throw - worker can still handle new sessions even if restoration fails
-    }
-  }
-
-  /**
    * Get info about active sessions.
    */
   getActiveSessions(): SessionInfo[] {
@@ -420,7 +305,10 @@ export class ChatSessionManager {
       // Create sync dependencies that adapt our infrastructure to the sync component
       const syncDeps: SyncDependencies = {
         fetchOpencodeSessions: async () => {
-          const sessions = await this.opencodeAdapter.listSessions(this.opencodeClient!);
+          if (!this.opencodeClient) {
+            return [];
+          }
+          const sessions = await this.opencodeAdapter.listSessions(this.opencodeClient);
           return sessions.map((s) => ({ id: s.id, title: s.title }));
         },
 
