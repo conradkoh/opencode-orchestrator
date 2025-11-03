@@ -1,7 +1,17 @@
 'use client';
 
 import { ActivityIcon, CheckCircle2Icon, CircleIcon, ClockIcon, Trash2Icon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +42,7 @@ export interface WorkersListProps {
 export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
   const { workers, loading } = useWorkers(machineId);
   const { removeWorker, isRemoving } = useRemoveWorker();
+  const [workerToRemove, setWorkerToRemove] = useState<{ id: string; name?: string } | null>(null);
 
   // Group workers by status
   const groupedWorkers = useMemo(() => {
@@ -46,24 +57,22 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
     };
   }, [workers]);
 
-  const handleRemove = useCallback(
-    async (workerId: string, workerName?: string) => {
-      const confirmed = window.confirm(
-        `Are you sure you want to remove ${workerName || `worker ${workerId.slice(0, 8)}...`}?\n\nThis action cannot be undone.`
-      );
+  const handleRemoveClick = useCallback((workerId: string, workerName?: string) => {
+    setWorkerToRemove({ id: workerId, name: workerName });
+  }, []);
 
-      if (!confirmed) return;
+  const handleRemoveConfirm = useCallback(async () => {
+    if (!workerToRemove) return;
 
-      try {
-        await removeWorker(workerId);
-        onWorkerRemoved?.();
-      } catch (error) {
-        console.error('Failed to remove worker:', error);
-        alert('Failed to remove worker. Please try again.');
-      }
-    },
-    [removeWorker, onWorkerRemoved]
-  );
+    try {
+      await removeWorker(workerToRemove.id);
+      setWorkerToRemove(null);
+      onWorkerRemoved?.();
+    } catch (error) {
+      console.error('Failed to remove worker:', error);
+      // Error is handled by the useRemoveWorker hook
+    }
+  }, [workerToRemove, removeWorker, onWorkerRemoved]);
 
   if (loading) {
     return (
@@ -101,95 +110,123 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Workers</CardTitle>
-        <CardDescription>
-          {totalWorkers} {totalWorkers === 1 ? 'worker' : 'workers'} registered
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Active Workers */}
-        {groupedWorkers.active.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <ActivityIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <h3 className="font-medium text-foreground">
-                Active Workers ({groupedWorkers.active.length})
-              </h3>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Workers</CardTitle>
+          <CardDescription>
+            {totalWorkers} {totalWorkers === 1 ? 'worker' : 'workers'} registered
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Active Workers */}
+          {groupedWorkers.active.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <ActivityIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <h3 className="font-medium text-foreground">
+                  Active Workers ({groupedWorkers.active.length})
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {groupedWorkers.active.map((worker) => (
+                  <WorkerItem
+                    key={worker.workerId}
+                    worker={worker}
+                    onRemove={handleRemoveClick}
+                    statusColor="green"
+                    isRemoving={isRemoving}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {groupedWorkers.active.map((worker) => (
-                <WorkerItem
-                  key={worker.workerId}
-                  worker={worker}
-                  onRemove={handleRemove}
-                  statusColor="green"
-                  isRemoving={isRemoving}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Separator between sections */}
-        {groupedWorkers.active.length > 0 && groupedWorkers.offline.length > 0 && <Separator />}
+          {/* Separator between sections */}
+          {groupedWorkers.active.length > 0 && groupedWorkers.offline.length > 0 && <Separator />}
 
-        {/* Offline Workers */}
-        {groupedWorkers.offline.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <CircleIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-              <h3 className="font-medium text-foreground">
-                Offline Workers ({groupedWorkers.offline.length})
-              </h3>
+          {/* Offline Workers */}
+          {groupedWorkers.offline.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <CircleIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <h3 className="font-medium text-foreground">
+                  Offline Workers ({groupedWorkers.offline.length})
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {groupedWorkers.offline.map((worker) => (
+                  <WorkerItem
+                    key={worker.workerId}
+                    worker={worker}
+                    onRemove={handleRemoveClick}
+                    statusColor="gray"
+                    isRemoving={isRemoving}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {groupedWorkers.offline.map((worker) => (
-                <WorkerItem
-                  key={worker.workerId}
-                  worker={worker}
-                  onRemove={handleRemove}
-                  statusColor="gray"
-                  isRemoving={isRemoving}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Separator between sections */}
-        {(groupedWorkers.active.length > 0 || groupedWorkers.offline.length > 0) &&
-          groupedWorkers.pending.length > 0 && <Separator />}
+          {/* Separator between sections */}
+          {(groupedWorkers.active.length > 0 || groupedWorkers.offline.length > 0) &&
+            groupedWorkers.pending.length > 0 && <Separator />}
 
-        {/* Pending Workers */}
-        {groupedWorkers.pending.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <ClockIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-              <h3 className="font-medium text-foreground">
-                Pending Authorization ({groupedWorkers.pending.length})
-              </h3>
+          {/* Pending Workers */}
+          {groupedWorkers.pending.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <ClockIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <h3 className="font-medium text-foreground">
+                  Pending Authorization ({groupedWorkers.pending.length})
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {groupedWorkers.pending.map((worker) => (
+                  <WorkerItem
+                    key={worker.workerId}
+                    worker={worker}
+                    onRemove={handleRemoveClick}
+                    statusColor="orange"
+                    isRemoving={isRemoving}
+                  />
+                ))}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                💡 Pending workers need to be approved before they can start. Scroll up to approve
+                them.
+              </div>
             </div>
-            <div className="space-y-2">
-              {groupedWorkers.pending.map((worker) => (
-                <WorkerItem
-                  key={worker.workerId}
-                  worker={worker}
-                  onRemove={handleRemove}
-                  statusColor="orange"
-                  isRemoving={isRemoving}
-                />
-              ))}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              💡 Pending workers need to be approved before they can start. Scroll up to approve
-              them.
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog
+        open={!!workerToRemove}
+        onOpenChange={(open) => !open && setWorkerToRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Worker</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove{' '}
+              {workerToRemove?.name || `worker ${workerToRemove?.id.slice(0, 8)}...`}? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveConfirm}
+              disabled={isRemoving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemoving ? 'Removing...' : 'Remove Worker'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -261,6 +298,7 @@ function WorkerItem({ worker, onRemove, statusColor, isRemoving }: WorkerItemPro
         onClick={() => onRemove(worker.workerId, worker.name)}
         disabled={isRemoving}
         className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        title="Remove worker"
       >
         <Trash2Icon className="h-4 w-4" />
       </Button>

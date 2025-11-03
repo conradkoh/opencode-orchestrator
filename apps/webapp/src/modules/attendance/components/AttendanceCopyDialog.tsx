@@ -120,11 +120,10 @@ export const AttendanceCopyDialog = ({
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
       } else {
-        alert('Failed to copy to clipboard. Please try copying manually from the preview.');
+        console.error('Failed to copy to clipboard. Please try copying manually from the preview.');
       }
     } catch (error) {
       console.error('Copy operation failed:', error);
-      alert('Failed to copy to clipboard. Please try copying manually from the preview.');
     }
   }, [generateCopyText]);
 
