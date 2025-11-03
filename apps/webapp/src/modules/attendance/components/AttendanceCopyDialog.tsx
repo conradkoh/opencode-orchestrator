@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useCurrentUser } from '@/modules/auth/AuthProvider';
 
 /**
  * Configuration options for copying attendance data.
@@ -47,7 +46,6 @@ export const AttendanceCopyDialog = ({
   allNames,
   attendanceMap,
 }: AttendanceCopyDialogProps) => {
-  const _currentUser = useCurrentUser();
   const [copySuccess, setCopySuccess] = useState(false);
   const [copyOptions, setCopyOptions] = useState<CopyOptions>({
     includeRemarks: false,

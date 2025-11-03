@@ -206,7 +206,7 @@ export function NameEditForm() {
       }, 1000);
 
       // Cleanup on timeout
-      const _timeout = setTimeout(
+      setTimeout(
         () => {
           clearInterval(pollInterval);
           if (!popup.closed) {

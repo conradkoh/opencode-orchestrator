@@ -374,7 +374,10 @@ async function _testNewCredentials(
       }),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as {
+      error?: string;
+      error_description?: string;
+    };
 
     // Check the error type to determine if credentials are valid
     if (result.error === 'invalid_grant') {

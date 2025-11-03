@@ -96,10 +96,9 @@ export const loginAnon = mutation({
     });
 
     // Create a new session if it doesn't exist
-    let _sessionId: Id<'sessions'>;
     if (!existingSession) {
       const now = Date.now();
-      _sessionId = await ctx.db.insert('sessions', {
+      await ctx.db.insert('sessions', {
         sessionId: args.sessionId,
         userId: userId as Id<'users'>,
         createdAt: now,
@@ -111,7 +110,6 @@ export const loginAnon = mutation({
         userId: userId as Id<'users'>,
         authMethod: 'anonymous',
       });
-      _sessionId = existingSession._id;
     }
 
     return { success: true, userId };

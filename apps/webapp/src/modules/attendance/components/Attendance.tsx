@@ -33,18 +33,6 @@ export interface AttendanceModuleProps {
 }
 
 /**
- * Internal component state interface for managing local UI state.
- */
-interface _AttendanceContentState {
-  expanded: string | null;
-  dialogOpen: boolean;
-  selectedPerson: string;
-  showFullListModal: boolean;
-  isManualJoin: boolean;
-  showCopyDialog: boolean;
-}
-
-/**
  * Main attendance content component that handles attendance list display and interactions.
  * Uses useSearchParams internally so it's wrapped in Suspense by the parent component.
  */

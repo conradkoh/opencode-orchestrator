@@ -50,13 +50,6 @@ const OAuthStateSchema = z.object({
 });
 
 /**
- * Encodes OAuth state into a URL-safe JSON string
- */
-function _encodeOAuthState(state: OAuthState): string {
-  return encodeURIComponent(JSON.stringify(state));
-}
-
-/**
  * Decodes and validates OAuth state from URL-encoded JSON string
  */
 function _decodeOAuthState(encodedState: string): OAuthState {
@@ -70,30 +63,6 @@ function _decodeOAuthState(encodedState: string): OAuthState {
       message: 'Invalid or malformed OAuth state parameter',
     });
   }
-}
-
-/**
- * Creates a structured OAuth state parameter for login flow
- */
-function _createLoginOAuthState(loginRequestId: string): string {
-  const state: OAuthState = {
-    flowType: 'login',
-    requestId: loginRequestId,
-    version: 'v1',
-  };
-  return _encodeOAuthState(state);
-}
-
-/**
- * Creates a structured OAuth state parameter for connect flow
- */
-function _createConnectOAuthState(connectRequestId: string): string {
-  const state: OAuthState = {
-    flowType: 'connect',
-    requestId: connectRequestId,
-    version: 'v1',
-  };
-  return _encodeOAuthState(state);
 }
 
 /**
@@ -174,14 +143,14 @@ export const exchangeGoogleCode = action({
       });
 
       if (!tokenResponse.ok) {
-        const _errorText = await tokenResponse.text();
+        await tokenResponse.text(); // Read error response but don't store it
         throw new ConvexError({
           code: 'OAUTH_ERROR',
           message: 'Failed to exchange authorization code for token',
         });
       }
 
-      const tokenData: _GoogleTokenResponse = await tokenResponse.json();
+      const tokenData = (await tokenResponse.json()) as _GoogleTokenResponse;
 
       // Step 2: Use access token to get user profile
       const profileResponse = await fetch(_GOOGLE_USERINFO_URL, {
@@ -191,14 +160,14 @@ export const exchangeGoogleCode = action({
       });
 
       if (!profileResponse.ok) {
-        const _errorText = await profileResponse.text();
+        await profileResponse.text(); // Read error response but don't store it
         throw new ConvexError({
           code: 'OAUTH_ERROR',
           message: 'Failed to fetch user profile from Google',
         });
       }
 
-      const profile: _GoogleProfile = await profileResponse.json();
+      const profile = (await profileResponse.json()) as _GoogleProfile;
 
       // Validate required profile fields
       if (!profile.id || !profile.email || !profile.name) {
