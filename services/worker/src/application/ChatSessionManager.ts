@@ -432,28 +432,24 @@ export class ChatSessionManager {
 
       // Step 4: Collect all write operations for parallelization
       const writeOps: Promise<void>[] = [];
-      let nameUpdates = 0;
+      let nameUpdatesQueued = 0;
       let deletions = 0;
       let newSessions = 0;
 
-      // 4a. Update session names from OpenCode (ONLY if name changed or never synced)
+      // 4a. Update session names from OpenCode (ONLY if name actually changed)
       for (const ocSession of opencodeSessions) {
         const convexSession = convexSessions.find((cs) => cs.opencodeSessionId === ocSession.id);
 
         if (convexSession && ocSession.title && convexSession.chatSessionId) {
-          // Smart filtering: only sync if name changed OR never synced OR synced before last sync
-          const needsSync =
-            !convexSession.lastSyncedNameAt || // Never synced
-            (lastSyncedAt && convexSession.lastSyncedNameAt < lastSyncedAt) || // Synced before last sync
-            convexSession.name !== ocSession.title; // Name changed
-
-          if (needsSync) {
+          // Only sync if name is different from what's stored
+          // The mutation will double-check and skip if unchanged
+          if (convexSession.name !== ocSession.title) {
+            nameUpdatesQueued++;
             writeOps.push(
               this.convexClient
                 .updateSessionName(convexSession.chatSessionId, ocSession.title)
                 .then((updated) => {
                   if (updated) {
-                    nameUpdates++;
                     console.log(
                       `📝 Updated name for session ${convexSession.chatSessionId}: "${ocSession.title}"`
                     );
@@ -537,7 +533,7 @@ export class ChatSessionManager {
       // Step 5: Execute all writes in parallel
       if (writeOps.length > 0) {
         console.log(
-          `⚡ Executing ${writeOps.length} write operations (${nameUpdates} names, ${deletions} deletions, ${newSessions} new)...`
+          `⚡ Executing ${writeOps.length} write operations (${nameUpdatesQueued} name updates, ${deletions} deletions, ${newSessions} new sessions)...`
         );
         await Promise.allSettled(writeOps);
       } else {
