@@ -82,7 +82,7 @@ export function calculateSyncPlan(
   for (const convexSession of convexSessions) {
     if (
       convexSession.opencodeSessionId &&
-      !opencodeById.has(convexSession.opencodeSessionId) &&
+      !opencodeById.has(convexSession.opencodeSessionId as string) &&
       !convexSession.deletedInOpencode
     ) {
       plan.deletions.push({
