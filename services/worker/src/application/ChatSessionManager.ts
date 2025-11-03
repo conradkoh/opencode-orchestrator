@@ -415,14 +415,14 @@ export class ChatSessionManager {
       const lastSyncedAt = await this.convexClient.getLastSyncTimestamp();
       console.log(`📅 Last sync: ${lastSyncedAt ? new Date(lastSyncedAt).toISOString() : 'never'}`);
 
-      // Step 2 & 3: Fetch sessions in parallel
+      // Step 2 & 3: Fetch ALL sessions (we need complete picture for duplicate detection)
       const [opencodeSessions, convexSessions] = await Promise.all([
         this.opencodeAdapter.listSessions(this.opencodeClient),
-        this.convexClient.getActiveSessions(lastSyncedAt || undefined),
+        this.convexClient.getActiveSessions(),
       ]);
 
       console.log(
-        `📊 Fetched ${opencodeSessions.length} OpenCode sessions, ${convexSessions.length} Convex sessions ${lastSyncedAt ? '(since last sync)' : '(all)'}`
+        `📊 Fetched ${opencodeSessions.length} OpenCode sessions, ${convexSessions.length} Convex sessions`
       );
 
       const opencodeSessionIds = new Set(opencodeSessions.map((s) => s.id));
@@ -432,24 +432,41 @@ export class ChatSessionManager {
 
       // Step 4: Collect all write operations for parallelization
       const writeOps: Promise<void>[] = [];
+      let nameUpdates = 0;
+      let deletions = 0;
+      let newSessions = 0;
 
-      // 4a. Update session names from OpenCode
+      // 4a. Update session names from OpenCode (ONLY if name changed or never synced)
       for (const ocSession of opencodeSessions) {
         const convexSession = convexSessions.find((cs) => cs.opencodeSessionId === ocSession.id);
 
         if (convexSession && ocSession.title && convexSession.chatSessionId) {
-          writeOps.push(
-            this.convexClient
-              .updateSessionName(convexSession.chatSessionId, ocSession.title)
-              .then(() => {
-                console.log(
-                  `📝 Updated name for session ${convexSession.chatSessionId}: "${ocSession.title}"`
-                );
-              })
-              .catch((error) => {
-                console.warn(`⚠️  Failed to update name for ${convexSession.chatSessionId}:`, error);
-              })
-          );
+          // Smart filtering: only sync if name changed OR never synced OR synced before last sync
+          const needsSync =
+            !convexSession.lastSyncedNameAt || // Never synced
+            (lastSyncedAt && convexSession.lastSyncedNameAt < lastSyncedAt) || // Synced before last sync
+            convexSession.name !== ocSession.title; // Name changed
+
+          if (needsSync) {
+            writeOps.push(
+              this.convexClient
+                .updateSessionName(convexSession.chatSessionId, ocSession.title)
+                .then((updated) => {
+                  if (updated) {
+                    nameUpdates++;
+                    console.log(
+                      `📝 Updated name for session ${convexSession.chatSessionId}: "${ocSession.title}"`
+                    );
+                  }
+                })
+                .catch((error) => {
+                  console.warn(
+                    `⚠️  Failed to update name for ${convexSession.chatSessionId}:`,
+                    error
+                  );
+                })
+            );
+          }
         }
       }
 
@@ -460,6 +477,7 @@ export class ChatSessionManager {
           !opencodeSessionIds.has(convexSession.opencodeSessionId) &&
           !convexSession.deletedInOpencode // Don't re-mark already deleted sessions
         ) {
+          deletions++;
           writeOps.push(
             this.convexClient
               .markSessionDeletedInOpencode(convexSession.chatSessionId)
@@ -477,9 +495,10 @@ export class ChatSessionManager {
         }
       }
 
-      // 4c. Sync new sessions created directly in OpenCode
+      // 4c. Sync new sessions created directly in OpenCode (check against ALL Convex sessions)
       for (const ocSession of opencodeSessions) {
         if (!convexOpencodeIds.has(ocSession.id as string)) {
+          newSessions++;
           writeOps.push(
             (async () => {
               try {
@@ -517,8 +536,12 @@ export class ChatSessionManager {
 
       // Step 5: Execute all writes in parallel
       if (writeOps.length > 0) {
-        console.log(`⚡ Executing ${writeOps.length} write operations in parallel...`);
+        console.log(
+          `⚡ Executing ${writeOps.length} write operations (${nameUpdates} names, ${deletions} deletions, ${newSessions} new)...`
+        );
         await Promise.allSettled(writeOps);
+      } else {
+        console.log('✅ No changes detected - sync state is stable');
       }
 
       // Step 6: Update last sync timestamp

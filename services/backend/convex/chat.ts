@@ -337,27 +337,20 @@ export const sessionReady = mutation({
  * Used by worker for session restoration after restart.
  *
  * @param workerId - Worker ID to get active sessions for
- * @param sinceTimestamp - Optional timestamp to get only sessions modified since this time
- * @returns Array of active sessions with OpenCode session IDs
+ * @returns Array of all active sessions with OpenCode session IDs
  */
 export const getActiveSessions = query({
   args: {
     workerId: v.string(),
-    sinceTimestamp: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Get all active sessions for this worker
-    let sessions = await ctx.db
+    // Get all active sessions for this worker (no timestamp filtering)
+    const sessions = await ctx.db
       .query('chatSessions')
       .withIndex('by_worker_and_status', (q) =>
         q.eq('workerId', args.workerId).eq('status', 'active')
       )
       .collect();
-
-    // Filter by timestamp if provided (incremental sync)
-    if (args.sinceTimestamp) {
-      sessions = sessions.filter((s) => s.lastActivity > args.sinceTimestamp!);
-    }
 
     return sessions.map((session) => ({
       chatSessionId: session.sessionId as ChatSessionId,
@@ -367,6 +360,8 @@ export const getActiveSessions = query({
       status: session.status,
       createdAt: session.createdAt,
       lastActivity: session.lastActivity,
+      name: session.name,
+      lastSyncedNameAt: session.lastSyncedNameAt,
       deletedInOpencode: session.deletedInOpencode,
     }));
   },
@@ -768,7 +763,7 @@ export const updateSessionName = mutation({
     chatSessionId: v.string(),
     name: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<boolean> => {
     const session = await ctx.db
       .query('chatSessions')
       .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
@@ -778,10 +773,18 @@ export const updateSessionName = mutation({
       throw new Error('Session not found');
     }
 
+    // Skip update if name hasn't changed
+    if (session.name === args.name) {
+      return false;
+    }
+
     await ctx.db.patch(session._id, {
       name: args.name,
+      lastSyncedNameAt: Date.now(),
       lastActivity: Date.now(),
     });
+
+    return true;
   },
 });
 
