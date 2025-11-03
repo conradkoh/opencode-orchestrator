@@ -1,6 +1,6 @@
 'use client';
 
-import { FolderIcon, ServerIcon, StopCircleIcon } from 'lucide-react';
+import { FolderIcon, PlusIcon, ServerIcon, StopCircleIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { useWorkers } from '../hooks/useWorkers';
 import { AssistantSelector } from './AssistantSelector';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
+import { CreateWorkerDialog } from './CreateWorkerDialog';
 import { MachineSelector } from './MachineSelector';
 import { ModelSelector } from './ModelSelector';
 import { SessionList } from './SessionList';
@@ -48,6 +49,7 @@ export function ChatInterface() {
   // Local UI state (not persisted to URL)
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [showNewSession, setShowNewSession] = useState(false);
+  const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
 
   const { connectWorker } = useConnectWorker();
 
@@ -291,8 +293,19 @@ export function ChatInterface() {
                 )}
               </>
             ) : (
-              <div className="text-sm text-muted-foreground">
-                No workers registered on this machine
+              <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-6">
+                <p className="text-sm text-muted-foreground">
+                  No workers registered on this machine
+                </p>
+                <Button
+                  onClick={() => setShowCreateWorkerDialog(true)}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Create Your First Worker
+                </Button>
               </div>
             )}
           </div>
@@ -387,6 +400,15 @@ export function ChatInterface() {
         <div className="flex-1 flex items-center justify-center border border-border rounded-lg bg-background">
           <p className="text-sm text-muted-foreground">Select an assistant to view sessions</p>
         </div>
+      )}
+
+      {/* Create Worker Dialog */}
+      {selectedMachineId && (
+        <CreateWorkerDialog
+          machineId={selectedMachineId}
+          open={showCreateWorkerDialog}
+          onOpenChange={setShowCreateWorkerDialog}
+        />
       )}
     </div>
   );
