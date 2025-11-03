@@ -1,6 +1,7 @@
 'use client';
 
 import { HistoryIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -43,8 +44,16 @@ export function SessionHistoryModal({
   onRestoreSession,
   isLoading,
 }: SessionHistoryModalProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleRestoreSession = (sessionId: string) => {
+    onRestoreSession(sessionId);
+    // Close modal after restoring session
+    setOpen(false);
+  };
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-7 w-7" title="View session history">
           <HistoryIcon className="h-4 w-4" />
@@ -58,10 +67,10 @@ export function SessionHistoryModal({
         <div className="flex-1 min-h-0 overflow-y-auto">
           <SessionList
             sessions={sessions}
-            onRestoreSession={onRestoreSession}
+            onRestoreSession={handleRestoreSession}
             onStartNew={() => {
-              // This is handled by closing the dialog
-              // User can start new session from main interface
+              // Close dialog when starting new
+              setOpen(false);
             }}
             isLoading={isLoading}
           />

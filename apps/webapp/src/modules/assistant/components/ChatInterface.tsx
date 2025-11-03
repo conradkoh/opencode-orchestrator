@@ -40,7 +40,7 @@ export function ChatInterface() {
   const {
     machineId: selectedMachineId,
     workerId: selectedWorkerId,
-    sessionId: urlSessionId,
+    chatSessionId: urlChatSessionId,
   } = urlState;
 
   // Data fetching
@@ -80,11 +80,11 @@ export function ChatInterface() {
     console.log('[ChatInterface] State:', {
       selectedMachineId,
       selectedWorkerId,
-      urlSessionId,
+      urlChatSessionId,
       session,
       messagesCount: messages.length,
     });
-  }, [selectedMachineId, selectedWorkerId, urlSessionId, session, messages.length]);
+  }, [selectedMachineId, selectedWorkerId, urlChatSessionId, session, messages.length]);
 
   // Request worker connection when worker is selected
   // This is a side effect (network request), not state synchronization
@@ -97,36 +97,36 @@ export function ChatInterface() {
     }
   }, [selectedWorkerId, connectWorker]);
 
-  // Clear active session when URL sessionId is cleared (user navigated away)
+  // Clear active session when URL chatSessionId is cleared (user navigated away)
   // Skip if we're currently ending a session (to allow terminated state to be visible)
   useEffect(() => {
-    if (!urlSessionId && session && !isEndingSession) {
+    if (!urlChatSessionId && session && !isEndingSession) {
       // URL session was cleared, so clear the active session in the hook
       clearSession();
     }
-  }, [urlSessionId, session, isEndingSession, clearSession]);
+  }, [urlChatSessionId, session, isEndingSession, clearSession]);
 
   // Restore session from URL on mount or when URL session changes
   // This is a side effect (restore session), not state synchronization
-  // Skip restoring if we're currently ending a session (urlSessionId is null but session still exists briefly)
+  // Skip restoring if we're currently ending a session (urlChatSessionId is null but session still exists briefly)
   useEffect(() => {
-    if (urlSessionId && selectedWorkerId && !session) {
-      console.log('[ChatInterface] Restoring session from URL:', urlSessionId);
+    if (urlChatSessionId && selectedWorkerId && !session) {
+      console.log('[ChatInterface] Restoring session from URL:', urlChatSessionId);
       // Check if this session is terminated before restoring
-      const urlSession = sessions?.find((s) => s.sessionId === urlSessionId);
+      const urlSession = sessions?.find((s) => s.sessionId === urlChatSessionId);
       if (urlSession?.status === 'terminated') {
         console.log('[ChatInterface] Skipping restore - session is terminated');
         // Clear terminated session from URL
-        urlActions.setSessionId(null);
+        urlActions.setChatSessionId(null);
         return;
       }
-      restoreSession(urlSessionId).catch((error) => {
+      restoreSession(urlChatSessionId).catch((error) => {
         console.error('[ChatInterface] Failed to restore session from URL:', error);
         // Clear invalid session from URL
-        urlActions.setSessionId(null);
+        urlActions.setChatSessionId(null);
       });
     }
-  }, [urlSessionId, selectedWorkerId, session, sessions, restoreSession, urlActions]);
+  }, [urlChatSessionId, selectedWorkerId, session, sessions, restoreSession, urlActions]);
 
   // Auto-select first model when worker is selected and no model is chosen
   useEffect(() => {
@@ -195,7 +195,7 @@ export function ChatInterface() {
           const newSessionId = await startSession(selectedModel);
           // Update URL with new session ID
           if (newSessionId) {
-            urlActions.setSessionId(newSessionId);
+            urlActions.setChatSessionId(newSessionId);
             sessionIdToUse = newSessionId;
           }
         }
@@ -225,7 +225,7 @@ export function ChatInterface() {
       try {
         await restoreSession(sessionId);
         // Update URL with restored session ID
-        urlActions.setSessionId(sessionId);
+        urlActions.setChatSessionId(sessionId);
         console.log('[ChatInterface] Session restored successfully');
         // Trigger focus after the component re-renders with the new session
         setShouldFocusInput(true);
@@ -244,7 +244,7 @@ export function ChatInterface() {
     setSelectedModel(null);
     setIsEndingSession(false); // Reset flag when closing
     // Clear session from URL (navigates away)
-    urlActions.setSessionId(null);
+    urlActions.setChatSessionId(null);
     // The useEffect will clear activeSessionId when URL is cleared
   }, [urlActions]);
 
@@ -262,7 +262,7 @@ export function ChatInterface() {
         await endSession();
       }
       // Clear the session from URL to allow starting fresh
-      urlActions.setSessionId(null);
+      urlActions.setChatSessionId(null);
       setIsEndingSession(false);
       // Trigger focus after the component re-renders without a session
       setShouldFocusInput(true);

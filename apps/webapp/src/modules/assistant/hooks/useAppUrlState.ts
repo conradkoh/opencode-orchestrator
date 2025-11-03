@@ -12,8 +12,8 @@ export interface AppUrlState {
   machineId: string | null;
   /** Selected worker ID */
   workerId: string | null;
-  /** Active session ID */
-  sessionId: string | null;
+  /** Active chat session ID (renamed from sessionId to avoid auth session confusion) */
+  chatSessionId: string | null;
 }
 
 /**
@@ -26,8 +26,8 @@ export interface AppUrlStateActions {
   setMachineId: (machineId: string | null) => void;
   /** Set the selected worker ID and clear session */
   setWorkerId: (workerId: string | null) => void;
-  /** Set the active session ID */
-  setSessionId: (sessionId: string | null) => void;
+  /** Set the active chat session ID */
+  setChatSessionId: (chatSessionId: string | null) => void;
   /** Clear all selections */
   clearAll: () => void;
 }
@@ -67,7 +67,7 @@ export function useAppUrlState(): {
     () => ({
       machineId: searchParams.get('machineId'),
       workerId: searchParams.get('workerId'),
-      sessionId: searchParams.get('sessionId'),
+      chatSessionId: searchParams.get('chatSessionId'),
     }),
     [searchParams]
   );
@@ -103,7 +103,7 @@ export function useAppUrlState(): {
         updateParams({
           machineId,
           workerId: null,
-          sessionId: null,
+          chatSessionId: null,
         });
       },
 
@@ -111,13 +111,13 @@ export function useAppUrlState(): {
         // When worker changes, clear session
         updateParams({
           workerId,
-          sessionId: null,
+          chatSessionId: null,
         });
       },
 
-      setSessionId: (sessionId: string | null) => {
+      setChatSessionId: (chatSessionId: string | null) => {
         updateParams({
-          sessionId,
+          chatSessionId,
         });
       },
 
@@ -125,7 +125,7 @@ export function useAppUrlState(): {
         updateParams({
           machineId: null,
           workerId: null,
-          sessionId: null,
+          chatSessionId: null,
         });
       },
     }),
