@@ -678,21 +678,23 @@ export const subscribeToChunks = query({
 
 /**
  * Subscribe to sessions for a worker (for worker service).
- * Returns all sessions for this worker, updates in real-time.
+ * Returns only active sessions for this worker, updates in real-time.
  * Used by worker to detect new sessions.
  *
  * @param workerId - Worker ID to get sessions for
- * @returns Array of sessions
+ * @returns Array of active sessions only
  */
 export const subscribeToWorkerSessions = query({
   args: {
     workerId: v.string(),
   },
   handler: async (ctx, args) => {
-    // Get all sessions for this worker
+    // Get only active sessions for this worker
     const sessions = await ctx.db
       .query('chatSessions')
-      .withIndex('by_worker_id', (q) => q.eq('workerId', args.workerId))
+      .withIndex('by_worker_and_status', (q) =>
+        q.eq('workerId', args.workerId).eq('status', 'active')
+      )
       .collect();
 
     return sessions.map((session) => ({

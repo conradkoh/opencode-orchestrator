@@ -259,8 +259,9 @@ export class ConvexClientAdapter {
         }
 
         // Check for new sessions (only after initial load)
+        // Note: Backend only returns active sessions, so no need to check status
         for (const session of sessions) {
-          if (!seenSessions.has(session.sessionId) && session.status === 'active') {
+          if (!seenSessions.has(session.sessionId)) {
             seenSessions.add(session.sessionId);
             console.log('🆕 New session detected:', session.sessionId, 'model:', session.model);
 
