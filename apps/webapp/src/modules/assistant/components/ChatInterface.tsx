@@ -3,7 +3,7 @@
 import { api } from '@workspace/backend/convex/_generated/api';
 import { useSessionMutation } from 'convex-helpers/react/sessions';
 import { FolderIcon, PlusIcon, ServerIcon, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAppUrlState } from '../hooks/useAppUrlState';
@@ -14,7 +14,7 @@ import { useMachines } from '../hooks/useMachines';
 import { useWorkerModels } from '../hooks/useWorkerModels';
 import { useWorkers } from '../hooks/useWorkers';
 import { AssistantSelector } from './AssistantSelector';
-import { ChatInputWithModel } from './ChatInputWithModel';
+import { type ChatInputHandle, ChatInputWithModel } from './ChatInputWithModel';
 import { ChatMessageList } from './ChatMessageList';
 import { MachineSelector } from './MachineSelector';
 import { SessionHistoryModal } from './SessionHistoryModal';
@@ -50,6 +50,10 @@ export function ChatInterface() {
   // Local UI state (not persisted to URL)
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+
+  // Refs for imperative focus control
+  const activeSessionInputRef = useRef<ChatInputHandle>(null);
+  const newSessionInputRef = useRef<ChatInputHandle>(null);
 
   const { connectWorker } = useConnectWorker();
 
@@ -168,6 +172,7 @@ export function ChatInterface() {
 
       try {
         let sessionIdToUse = session?.sessionId;
+        const hadSession = !!session;
 
         // If no active session, create one first
         if (!session) {
@@ -185,6 +190,17 @@ export function ChatInterface() {
         // which may not have updated yet
         if (sessionIdToUse) {
           await sendMessageMutation({ chatSessionId: sessionIdToUse, content });
+
+          // Focus the appropriate input after message is sent
+          // Use setTimeout to ensure DOM updates and state changes have completed
+          setTimeout(() => {
+            if (hadSession) {
+              activeSessionInputRef.current?.focus();
+            } else {
+              // After creating a new session, the active session input will be rendered
+              activeSessionInputRef.current?.focus();
+            }
+          }, 100);
         }
       } catch (error) {
         console.error('[ChatInterface] Failed to send message:', error);
@@ -195,6 +211,7 @@ export function ChatInterface() {
 
   /**
    * Handles restoring an existing session.
+   * Focuses input after restoration.
    */
   const handleRestoreSession = useCallback(
     async (sessionId: string) => {
@@ -204,6 +221,11 @@ export function ChatInterface() {
         // Update URL with restored session ID
         urlActions.setSessionId(sessionId);
         console.log('[ChatInterface] Session restored successfully');
+
+        // Focus the input after restoration
+        setTimeout(() => {
+          activeSessionInputRef.current?.focus();
+        }, 100);
       } catch (error) {
         console.error('Failed to restore session:', error);
       }
@@ -225,6 +247,7 @@ export function ChatInterface() {
 
   /**
    * Handles starting new session flow by ending current session.
+   * Focuses input after clearing session.
    */
   const handleStartNew = useCallback(async () => {
     if (!session) return;
@@ -238,6 +261,11 @@ export function ChatInterface() {
       // Clear the session from URL to allow starting fresh
       urlActions.setSessionId(null);
       setIsEndingSession(false);
+
+      // Focus the new session input
+      setTimeout(() => {
+        newSessionInputRef.current?.focus();
+      }, 100);
     } catch (error) {
       console.error('[ChatInterface] Failed to end session:', error);
       setIsEndingSession(false);
@@ -402,6 +430,7 @@ export function ChatInterface() {
           {/* Input Area */}
           <div className="p-4 pt-6">
             <ChatInputWithModel
+              ref={activeSessionInputRef}
               onSendMessage={handleSendMessage}
               selectedModel={selectedModel}
               availableModels={availableModels}
@@ -436,6 +465,7 @@ export function ChatInterface() {
           {/* Chat input - always visible */}
           <div className="flex-1 flex flex-col justify-end p-4">
             <ChatInputWithModel
+              ref={newSessionInputRef}
               onSendMessage={handleSendMessage}
               selectedModel={selectedModel}
               availableModels={availableModels}
