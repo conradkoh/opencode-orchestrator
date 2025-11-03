@@ -88,6 +88,7 @@ export function ChatInterface() {
 
   // Request worker connection when worker is selected
   // This is a side effect (network request), not state synchronization
+  // biome-ignore lint/correctness/useExhaustiveDependencies: connectWorker reference changes on every render, but we only want to trigger when workerId changes
   useEffect(() => {
     if (selectedWorkerId) {
       // Request worker to connect and initialize opencode
@@ -95,7 +96,7 @@ export function ChatInterface() {
         console.error('[ChatInterface] Failed to connect worker:', error);
       });
     }
-  }, [selectedWorkerId, connectWorker]);
+  }, [selectedWorkerId]);
 
   // Clear active session when URL chatSessionId is cleared (user navigated away)
   // Skip if we're currently ending a session (to allow terminated state to be visible)
