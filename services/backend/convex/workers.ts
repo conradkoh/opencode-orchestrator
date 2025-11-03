@@ -419,10 +419,12 @@ export const heartbeat = mutation({
 /**
  * Update worker status to offline.
  * Called by the worker process on graceful shutdown.
+ * Also terminates all active sessions for this worker.
  *
  * @param machineId - Machine ID from token
  * @param workerId - Worker ID from token
  * @param secret - Cryptographic secret from token
+ * @returns Number of sessions terminated
  */
 export const setOffline = mutation({
   args: {
@@ -439,7 +441,7 @@ export const setOffline = mutation({
       .first();
 
     if (!worker) {
-      return; // Worker doesn't exist, nothing to update
+      return { sessionsTerminated: 0 }; // Worker doesn't exist, nothing to update
     }
 
     // Validate secret
@@ -453,10 +455,34 @@ export const setOffline = mutation({
       lastHeartbeat: Date.now(),
     });
 
+    // Terminate all active sessions for this worker
+    const activeSessions = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_worker_and_status', (q) =>
+        q.eq('workerId', args.workerId).eq('status', 'active')
+      )
+      .collect();
+
+    let terminatedCount = 0;
+    for (const session of activeSessions) {
+      await ctx.db.patch(session._id, {
+        status: 'terminated',
+      });
+      terminatedCount++;
+    }
+
+    if (terminatedCount > 0) {
+      console.log(
+        `[workers.setOffline] Terminated ${terminatedCount} active session(s) for offline worker`
+      );
+    }
+
     // Update machine status
     await ctx.scheduler.runAfter(0, internal.machines.updateMachineStatus, {
       machineId: args.machineId,
     });
+
+    return { sessionsTerminated: terminatedCount };
   },
 });
 

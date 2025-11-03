@@ -138,6 +138,7 @@ export class ConvexClientAdapter {
   /**
    * Stop heartbeat and update worker status to offline.
    * Called during graceful shutdown.
+   * Also terminates all active sessions.
    */
   async disconnect(): Promise<void> {
     // Stop heartbeat
@@ -146,13 +147,17 @@ export class ConvexClientAdapter {
       this.heartbeatInterval = null;
     }
 
-    // Update status to offline
+    // Update status to offline and terminate sessions
     try {
-      await this.httpClient.mutation(api.workers.setOffline, {
+      const result = await this.httpClient.mutation(api.workers.setOffline, {
         machineId: this.config.machineId,
         workerId: this.config.workerId,
         secret: this.config.secret,
       });
+
+      if (result.sessionsTerminated > 0) {
+        console.log(`✅ Terminated ${result.sessionsTerminated} active session(s)`);
+      }
     } catch (error) {
       console.error(
         '❌ Failed to set offline status:',
