@@ -43,7 +43,7 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   return (
     <Select
-      value={selectedModel || undefined}
+      value={selectedModel ?? ''}
       onValueChange={onModelChange}
       disabled={disabled || models.length === 0}
     >

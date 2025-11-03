@@ -54,9 +54,14 @@ export function SessionList({
 }: SessionListProps) {
   /**
    * Handles session item click to restore a session.
+   * Prevents restoring terminated sessions.
    */
   const handleSessionClick = useCallback(
-    (sessionId: string) => {
+    (sessionId: string, sessionStatus: string) => {
+      // Don't restore terminated sessions
+      if (sessionStatus === 'terminated') {
+        return;
+      }
       onRestoreSession(sessionId);
     },
     [onRestoreSession]
@@ -96,7 +101,7 @@ export function SessionList({
               <button
                 key={session.sessionId}
                 type="button"
-                onClick={() => handleSessionClick(session.sessionId)}
+                onClick={() => handleSessionClick(session.sessionId, session.status)}
                 disabled={isLoading}
                 className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -126,9 +131,9 @@ export function SessionList({
                 <button
                   key={session.sessionId}
                   type="button"
-                  onClick={() => handleSessionClick(session.sessionId)}
-                  disabled={isLoading}
-                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed opacity-60"
+                  onClick={() => handleSessionClick(session.sessionId, session.status)}
+                  disabled={true}
+                  className="w-full text-left p-3 rounded-lg border border-border opacity-60 cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">

@@ -190,6 +190,11 @@ export interface AssistantChatReturn {
    * @returns Promise that resolves when session is ended
    */
   endSession: () => Promise<void>;
+  /**
+   * Clears the current active session (without terminating it).
+   * Used when navigating away from a session.
+   */
+  clearSession: () => void;
 
   // Messaging
   /** Array of messages in the current session */

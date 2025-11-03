@@ -1,6 +1,8 @@
 'use client';
 
-import { FolderIcon, ServerIcon, StopCircleIcon } from 'lucide-react';
+import { api } from '@workspace/backend/convex/_generated/api';
+import { useSessionMutation } from 'convex-helpers/react/sessions';
+import { FolderIcon, PlusIcon, ServerIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,11 +14,10 @@ import { useMachines } from '../hooks/useMachines';
 import { useWorkerModels } from '../hooks/useWorkerModels';
 import { useWorkers } from '../hooks/useWorkers';
 import { AssistantSelector } from './AssistantSelector';
-import { ChatInput } from './ChatInput';
+import { ChatInputWithModel } from './ChatInputWithModel';
 import { ChatMessageList } from './ChatMessageList';
 import { MachineSelector } from './MachineSelector';
-import { ModelSelector } from './ModelSelector';
-import { SessionList } from './SessionList';
+import { SessionHistoryModal } from './SessionHistoryModal';
 import { WorkerActionMenu } from './WorkerActionMenu';
 
 /**
@@ -48,7 +49,7 @@ export function ChatInterface() {
 
   // Local UI state (not persisted to URL)
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [showNewSession, setShowNewSession] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState(false);
 
   const { connectWorker } = useConnectWorker();
 
@@ -62,8 +63,11 @@ export function ChatInterface() {
   const availableModels = useMemo(() => workerModels?.map((m) => m.id) || [], [workerModels]);
 
   const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedWorkerId);
-  const { session, startSession, restoreSession, endSession, messages, sendMessage, isLoading } =
+  const { session, startSession, restoreSession, endSession, clearSession, messages, isLoading } =
     useAssistantChat(selectedWorkerId);
+
+  // Get sendMessage mutation directly for auto-session creation
+  const sendMessageMutation = useSessionMutation(api.chat.sendMessage);
 
   // Debug logging
   useEffect(() => {
@@ -73,9 +77,8 @@ export function ChatInterface() {
       urlSessionId,
       session,
       messagesCount: messages.length,
-      showNewSession,
     });
-  }, [selectedMachineId, selectedWorkerId, urlSessionId, session, messages.length, showNewSession]);
+  }, [selectedMachineId, selectedWorkerId, urlSessionId, session, messages.length]);
 
   // Request worker connection when worker is selected
   // This is a side effect (network request), not state synchronization
@@ -88,25 +91,43 @@ export function ChatInterface() {
     }
   }, [selectedWorkerId, connectWorker]);
 
+  // Clear active session when URL sessionId is cleared (user navigated away)
+  // Skip if we're currently ending a session (to allow terminated state to be visible)
+  useEffect(() => {
+    if (!urlSessionId && session && !isEndingSession) {
+      // URL session was cleared, so clear the active session in the hook
+      clearSession();
+    }
+  }, [urlSessionId, session, isEndingSession, clearSession]);
+
   // Restore session from URL on mount or when URL session changes
   // This is a side effect (restore session), not state synchronization
+  // Skip restoring if we're currently ending a session (urlSessionId is null but session still exists briefly)
   useEffect(() => {
     if (urlSessionId && selectedWorkerId && !session) {
       console.log('[ChatInterface] Restoring session from URL:', urlSessionId);
+      // Check if this session is terminated before restoring
+      const urlSession = sessions?.find((s) => s.sessionId === urlSessionId);
+      if (urlSession?.status === 'terminated') {
+        console.log('[ChatInterface] Skipping restore - session is terminated');
+        // Clear terminated session from URL
+        urlActions.setSessionId(null);
+        return;
+      }
       restoreSession(urlSessionId).catch((error) => {
         console.error('[ChatInterface] Failed to restore session from URL:', error);
         // Clear invalid session from URL
         urlActions.setSessionId(null);
       });
     }
-  }, [urlSessionId, selectedWorkerId, session, restoreSession, urlActions]);
+  }, [urlSessionId, selectedWorkerId, session, sessions, restoreSession, urlActions]);
 
-  // Auto-select first model when starting new session
+  // Auto-select first model when worker is selected and no model is chosen
   useEffect(() => {
-    if (showNewSession && availableModels.length > 0 && !selectedModel) {
+    if (selectedWorkerId && availableModels.length > 0 && !selectedModel) {
       setSelectedModel(availableModels[0]);
     }
-  }, [showNewSession, availableModels, selectedModel]);
+  }, [selectedWorkerId, availableModels, selectedModel]);
 
   /**
    * Handles machine selection change.
@@ -116,7 +137,6 @@ export function ChatInterface() {
     (machineId: string) => {
       urlActions.setMachineId(machineId);
       // Reset local UI state
-      setShowNewSession(false);
       setSelectedModel(null);
     },
     [urlActions]
@@ -130,28 +150,48 @@ export function ChatInterface() {
     (workerId: string) => {
       urlActions.setWorkerId(workerId);
       // Reset local UI state
-      setShowNewSession(false);
       setSelectedModel(null);
     },
     [urlActions]
   );
 
   /**
-   * Handles starting a new chat session with the selected model.
+   * Handles sending a message to the active session.
+   * Auto-creates a session if none exists.
    */
-  const handleStartSession = useCallback(async () => {
-    if (!selectedModel) return;
-    try {
-      const newSessionId = await startSession(selectedModel);
-      setShowNewSession(false);
-      // Update URL with new session ID
-      if (newSessionId) {
-        urlActions.setSessionId(newSessionId);
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      if (!selectedModel) {
+        console.error('[ChatInterface] No model selected');
+        return;
       }
-    } catch (error) {
-      console.error('Failed to start session:', error);
-    }
-  }, [selectedModel, startSession, urlActions]);
+
+      try {
+        let sessionIdToUse = session?.sessionId;
+
+        // If no active session, create one first
+        if (!session) {
+          console.log('[ChatInterface] No active session, creating new session first');
+          const newSessionId = await startSession(selectedModel);
+          // Update URL with new session ID
+          if (newSessionId) {
+            urlActions.setSessionId(newSessionId);
+            sessionIdToUse = newSessionId;
+          }
+        }
+
+        // Send the message using the session ID directly
+        // We can't rely on sendMessage() from the hook because it depends on activeSessionId state
+        // which may not have updated yet
+        if (sessionIdToUse) {
+          await sendMessageMutation({ chatSessionId: sessionIdToUse, content });
+        }
+      } catch (error) {
+        console.error('[ChatInterface] Failed to send message:', error);
+      }
+    },
+    [selectedModel, session, startSession, sendMessageMutation, urlActions]
+  );
 
   /**
    * Handles restoring an existing session.
@@ -161,7 +201,6 @@ export function ChatInterface() {
       console.log('[ChatInterface] Restoring session:', sessionId);
       try {
         await restoreSession(sessionId);
-        setShowNewSession(false);
         // Update URL with restored session ID
         urlActions.setSessionId(sessionId);
         console.log('[ChatInterface] Session restored successfully');
@@ -173,58 +212,45 @@ export function ChatInterface() {
   );
 
   /**
-   * Handles ending the current session.
+   * Handles closing the current session (navigates away without terminating).
+   * If session is already terminated, this clears it from view.
    */
-  const handleEndSession = useCallback(async () => {
-    try {
-      await endSession();
-      setSelectedModel(null);
-      setShowNewSession(false);
-      // Clear session from URL
-      urlActions.setSessionId(null);
-    } catch (error) {
-      console.error('Failed to end session:', error);
-    }
-  }, [endSession, urlActions]);
-
-  /**
-   * Handles sending a message to the active session.
-   */
-  const handleSendMessage = useCallback(
-    async (content: string) => {
-      if (!session) return;
-      try {
-        await sendMessage(content);
-      } catch (error) {
-        console.error('Failed to send message:', error);
-      }
-    },
-    [session, sendMessage]
-  );
-
-  /**
-   * Handles canceling new session creation.
-   */
-  const handleCancelNewSession = useCallback(() => {
-    setShowNewSession(false);
+  const handleCloseSession = useCallback(() => {
     setSelectedModel(null);
-  }, []);
+    setIsEndingSession(false); // Reset flag when closing
+    // Clear session from URL (navigates away)
+    urlActions.setSessionId(null);
+    // The useEffect will clear activeSessionId when URL is cleared
+  }, [urlActions]);
 
   /**
-   * Handles starting new session flow.
+   * Handles starting new session flow by ending current session.
    */
-  const handleStartNew = useCallback(() => {
-    setShowNewSession(true);
-  }, []);
+  const handleStartNew = useCallback(async () => {
+    if (!session) return;
+
+    try {
+      // End current session if it exists and isn't already terminated
+      if (session.status !== 'terminated') {
+        console.log('[ChatInterface] Ending current session before starting new one');
+        await endSession();
+      }
+      // Clear the session from URL to allow starting fresh
+      urlActions.setSessionId(null);
+      setIsEndingSession(false);
+    } catch (error) {
+      console.error('[ChatInterface] Failed to end session:', error);
+      setIsEndingSession(false);
+    }
+  }, [session, endSession, urlActions]);
 
   /**
    * Handles model selection change.
    */
   const handleModelChange = useCallback((model: string) => {
+    console.log('[ChatInterface] Model changed to:', model);
     setSelectedModel(model);
   }, []);
-
-  const canSendMessage = useMemo(() => !!session && !isLoading, [session, isLoading]);
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -321,22 +347,51 @@ export function ChatInterface() {
             <div className="sticky top-0 z-10 border-b border-border bg-background p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400 animate-pulse" />
-                  <span>
-                    Session active • Model:{' '}
-                    <span className="font-medium text-foreground">{session.model}</span>
-                  </span>
+                  {session.status === 'terminated' ? (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-gray-500 dark:bg-gray-400" />
+                      <span>
+                        Session terminated • Model:{' '}
+                        <span className="font-medium text-foreground">{session.model}</span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400 animate-pulse" />
+                      <span>
+                        Session active • Model:{' '}
+                        <span className="font-medium text-foreground">{session.model}</span>
+                      </span>
+                    </>
+                  )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleEndSession}
-                  disabled={isLoading}
-                  className="h-7 text-xs"
-                >
-                  <StopCircleIcon className="mr-1.5 h-3.5 w-3.5" />
-                  End Session
-                </Button>
+                <div className="flex items-center gap-1">
+                  <SessionHistoryModal
+                    sessions={sessions}
+                    onRestoreSession={handleRestoreSession}
+                    isLoading={sessionsLoading}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleStartNew}
+                    disabled={isLoading}
+                    className="h-7 w-7"
+                    title="New session (ends current)"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCloseSession}
+                    disabled={isLoading}
+                    className="h-7 w-7"
+                    title="Close"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="flex-1 min-h-0">
@@ -346,56 +401,51 @@ export function ChatInterface() {
 
           {/* Input Area */}
           <div className="border-t border-border p-4">
-            <ChatInput
+            <ChatInputWithModel
               onSendMessage={handleSendMessage}
-              disabled={!canSendMessage}
-              placeholder="Type your message... (Shift+Enter for new line)"
+              selectedModel={selectedModel}
+              availableModels={availableModels}
+              onModelChange={handleModelChange}
+              hasActiveSession={!!session && session.status !== 'terminated'}
+              disabled={isLoading || session?.status === 'terminated'}
+              placeholder={
+                session?.status === 'terminated'
+                  ? 'Session terminated - cannot send messages'
+                  : 'Type your message... (Shift+Enter for new line)'
+              }
               autoFocus={true}
             />
           </div>
         </div>
       ) : selectedWorkerId ? (
-        <div className="flex-1 flex flex-col min-h-0 border border-border rounded-lg bg-background p-4">
-          {showNewSession ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-foreground">Start New Session</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelNewSession}
-                  className="h-7 text-xs"
-                >
-                  Cancel
-                </Button>
+        <div className="flex-1 flex flex-col min-h-0 border border-border rounded-lg bg-background">
+          {/* Header with History */}
+          <div className="border-b border-border p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {selectedWorker?.name || `Worker ${selectedWorkerId.slice(0, 8)}`}
               </div>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <span className="text-xs text-muted-foreground">Model</span>
-                  <ModelSelector
-                    models={availableModels}
-                    selectedModel={selectedModel}
-                    onModelChange={handleModelChange}
-                    disabled={false}
-                  />
-                </div>
-                <Button
-                  onClick={handleStartSession}
-                  disabled={!selectedModel || isLoading}
-                  className="w-full"
-                >
-                  {isLoading ? 'Starting...' : 'Start Session'}
-                </Button>
-              </div>
+              <SessionHistoryModal
+                sessions={sessions}
+                onRestoreSession={handleRestoreSession}
+                isLoading={sessionsLoading}
+              />
             </div>
-          ) : (
-            <SessionList
-              sessions={sessions}
-              onRestoreSession={handleRestoreSession}
-              onStartNew={handleStartNew}
-              isLoading={sessionsLoading || isLoading}
+          </div>
+
+          {/* Chat input - always visible */}
+          <div className="flex-1 flex flex-col justify-end p-4">
+            <ChatInputWithModel
+              onSendMessage={handleSendMessage}
+              selectedModel={selectedModel}
+              availableModels={availableModels}
+              onModelChange={handleModelChange}
+              hasActiveSession={false}
+              disabled={isLoading}
+              placeholder="Type your message... (Shift+Enter for new line)"
+              autoFocus={true}
             />
-          )}
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center border border-border rounded-lg bg-background">

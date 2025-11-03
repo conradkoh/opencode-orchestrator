@@ -47,6 +47,8 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   );
 
   // Convert session data to ChatSession type
+  // Allow terminated sessions to be viewed if explicitly selected (activeSessionId is set)
+  // This allows users to see the terminated state after ending a session
   const session = useMemo<ChatSession | null>(() => {
     console.log('[useAssistantChat] Session data:', {
       activeSessionId,
@@ -55,6 +57,8 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
       allSessionsCount: allSessions?.length,
     });
     if (!sessionData) return null;
+    // Return session even if terminated, as long as it's explicitly selected
+    // This allows viewing terminated sessions (read-only)
     return {
       sessionId: sessionData.sessionId,
       workerId: sessionData.workerId,
@@ -172,7 +176,10 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   );
 
   /**
-   * Ends the current active session and clears messages.
+   * Ends the current active session.
+   * Note: This terminates the session but keeps activeSessionId set
+   * so the user can see the terminated state. The session will be cleared
+   * when they navigate away or select a different session.
    */
   const endSession = useCallback(async () => {
     if (!activeSessionId) return;
@@ -182,7 +189,8 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
 
     try {
       await endSessionMutation({ chatSessionId: activeSessionId });
-      setActiveSessionId(null);
+      // Don't clear activeSessionId here - keep it set so user can see terminated state
+      // The UI will show the session as terminated, and user can close it
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);
@@ -219,6 +227,14 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     [activeSessionId, sendMessageMutation]
   );
 
+  /**
+   * Clears the current active session without terminating it.
+   * Used when navigating away from a session.
+   */
+  const clearSession = useCallback(() => {
+    setActiveSessionId(null);
+  }, []);
+
   // Clear active session when worker changes
   useEffect(() => {
     if (workerId) {
@@ -231,6 +247,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     startSession,
     restoreSession,
     endSession,
+    clearSession,
     messages: messagesWithChunks,
     sendMessage,
     isLoading,
