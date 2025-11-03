@@ -140,7 +140,7 @@ export interface ChatSession {
   /** AI model being used for this session */
   model: string;
   /** Current status of the session */
-  status: 'active' | 'idle' | 'terminated';
+  status: 'active' | 'inactive';
   /** Timestamp when the session was created */
   createdAt: number;
   /** Timestamp of last activity */

@@ -35,7 +35,7 @@ function _formatTimeAgo(timestamp: number): string {
 
 /**
  * Component for displaying a list of chat sessions for an assistant.
- * Shows active/idle sessions separately from terminated sessions, with ability to restore or start new.
+ * Shows active sessions separately from inactive sessions, with ability to restore or start new.
  *
  * @example
  * ```typescript
@@ -54,12 +54,12 @@ export function SessionList({
 }: SessionListProps) {
   /**
    * Handles session item click to restore a session.
-   * Prevents restoring terminated sessions.
+   * Prevents restoring inactive sessions.
    */
   const handleSessionClick = useCallback(
     (sessionId: string, sessionStatus: string) => {
-      // Don't restore terminated sessions
-      if (sessionStatus === 'terminated') {
+      // Don't restore inactive sessions
+      if (sessionStatus === 'inactive') {
         return;
       }
       onRestoreSession(sessionId);
@@ -68,10 +68,10 @@ export function SessionList({
   );
 
   // Separate sessions by status
-  const { activeSessions, terminatedSessions } = useMemo(() => {
-    const active = sessions.filter((s) => s.status === 'active' || s.status === 'idle');
-    const terminated = sessions.filter((s) => s.status === 'terminated');
-    return { activeSessions: active, terminatedSessions: terminated };
+  const { activeSessions, inactiveSessions } = useMemo(() => {
+    const active = sessions.filter((s) => s.status === 'active');
+    const inactive = sessions.filter((s) => s.status === 'inactive');
+    return { activeSessions: active, inactiveSessions: inactive };
   }, [sessions]);
 
   return (
@@ -90,7 +90,7 @@ export function SessionList({
         </Button>
       </div>
 
-      {activeSessions.length === 0 && terminatedSessions.length === 0 ? (
+      {activeSessions.length === 0 && inactiveSessions.length === 0 ? (
         <div className="py-8 text-center">
           <p className="text-sm text-muted-foreground">No previous sessions</p>
         </div>
@@ -120,14 +120,14 @@ export function SessionList({
               </button>
             ))}
 
-          {terminatedSessions.length > 0 && (
+          {inactiveSessions.length > 0 && (
             <>
               {activeSessions.length > 0 && (
                 <div className="pt-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Terminated</p>
+                  <p className="text-xs text-muted-foreground mb-2">Closed</p>
                 </div>
               )}
-              {terminatedSessions.map((session) => (
+              {inactiveSessions.map((session) => (
                 <button
                   key={session.sessionId}
                   type="button"

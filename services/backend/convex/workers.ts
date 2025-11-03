@@ -455,7 +455,7 @@ export const setOffline = mutation({
       lastHeartbeat: Date.now(),
     });
 
-    // Terminate all active sessions for this worker
+    // Mark all active sessions as inactive when worker goes offline
     const activeSessions = await ctx.db
       .query('chatSessions')
       .withIndex('by_worker_and_status', (q) =>
@@ -463,17 +463,17 @@ export const setOffline = mutation({
       )
       .collect();
 
-    let terminatedCount = 0;
+    let inactivatedCount = 0;
     for (const session of activeSessions) {
       await ctx.db.patch(session._id, {
-        status: 'terminated',
+        status: 'inactive',
       });
-      terminatedCount++;
+      inactivatedCount++;
     }
 
-    if (terminatedCount > 0) {
+    if (inactivatedCount > 0) {
       console.log(
-        `[workers.setOffline] Terminated ${terminatedCount} active session(s) for offline worker`
+        `[workers.setOffline] Marked ${inactivatedCount} session(s) as inactive for offline worker`
       );
     }
 
@@ -482,7 +482,7 @@ export const setOffline = mutation({
       machineId: args.machineId,
     });
 
-    return { sessionsTerminated: terminatedCount };
+    return { sessionsInactivated: inactivatedCount };
   },
 });
 

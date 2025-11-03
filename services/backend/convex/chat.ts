@@ -108,9 +108,9 @@ export const endSession = mutation({
       throw new Error('Unauthorized: You do not own this session');
     }
 
-    // Update session status
+    // Update session status to inactive
     await ctx.db.patch(session._id, {
-      status: 'terminated',
+      status: 'inactive',
       lastActivity: Date.now(),
     });
   },

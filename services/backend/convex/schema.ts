@@ -323,7 +323,7 @@ export default defineSchema({
     workerId: v.string(), // Worker handling this session
     userId: v.id('users'), // User who owns this session
     model: v.string(), // AI model being used (e.g., "claude-sonnet-4-5")
-    status: v.union(v.literal('active'), v.literal('idle'), v.literal('terminated')),
+    status: v.union(v.literal('active'), v.literal('inactive')),
     createdAt: v.number(), // When session was created
     lastActivity: v.number(), // Last message or interaction timestamp
     deletedAt: v.optional(v.number()), // When session was soft-deleted (if deleted from OpenCode)

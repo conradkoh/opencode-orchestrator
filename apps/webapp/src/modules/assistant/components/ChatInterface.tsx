@@ -86,11 +86,11 @@ export function ChatInterface() {
     });
   }, [selectedMachineId, selectedWorkerId, urlChatSessionId, session, messages.length]);
 
-  // Auto-close session when it's terminated (e.g. worker went offline)
+  // Auto-close session when it becomes inactive (e.g. worker went offline or user closed it)
   useEffect(() => {
-    if (session?.status === 'terminated' && urlChatSessionId) {
-      console.log('[ChatInterface] Session terminated, clearing from URL');
-      // Clear terminated session from URL after a brief delay to show the state
+    if (session?.status === 'inactive' && urlChatSessionId) {
+      console.log('[ChatInterface] Session inactive, clearing from URL');
+      // Clear inactive session from URL after a brief delay to show the state
       setTimeout(() => {
         urlActions.setChatSessionId(null);
       }, 1000);
@@ -124,11 +124,11 @@ export function ChatInterface() {
   useEffect(() => {
     if (urlChatSessionId && selectedWorkerId && !session) {
       console.log('[ChatInterface] Restoring session from URL:', urlChatSessionId);
-      // Check if this session is terminated before restoring
+      // Check if this session is inactive before restoring
       const urlSession = sessions?.find((s) => s.sessionId === urlChatSessionId);
-      if (urlSession?.status === 'terminated') {
-        console.log('[ChatInterface] Skipping restore - session is terminated');
-        // Clear terminated session from URL
+      if (urlSession?.status === 'inactive') {
+        console.log('[ChatInterface] Skipping restore - session is inactive');
+        // Clear inactive session from URL
         urlActions.setChatSessionId(null);
         return;
       }
@@ -248,8 +248,8 @@ export function ChatInterface() {
   );
 
   /**
-   * Handles closing the current session (navigates away without terminating).
-   * If session is already terminated, this clears it from view.
+   * Handles closing the current session (navigates away without ending).
+   * If session is already inactive, this clears it from view.
    */
   const handleCloseSession = useCallback(() => {
     setSelectedModel(null);
@@ -267,8 +267,8 @@ export function ChatInterface() {
     if (!session) return;
 
     try {
-      // End current session if it exists and isn't already terminated
-      if (session.status !== 'terminated') {
+      // End current session if it exists and isn't already inactive
+      if (session.status !== 'inactive') {
         console.log('[ChatInterface] Ending current session before starting new one');
         await endSession();
       }
@@ -386,11 +386,11 @@ export function ChatInterface() {
             <div className="sticky top-0 z-10 border-b border-border bg-background p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {session.status === 'terminated' ? (
+                  {session.status === 'inactive' ? (
                     <>
                       <span className="h-1.5 w-1.5 rounded-full bg-gray-500 dark:bg-gray-400" />
                       <span>
-                        Session terminated • Model:{' '}
+                        Session closed • Model:{' '}
                         <span className="font-medium text-foreground">{session.model}</span>
                       </span>
                     </>
@@ -446,11 +446,11 @@ export function ChatInterface() {
               selectedModel={selectedModel}
               availableModels={availableModels}
               onModelChange={handleModelChange}
-              hasActiveSession={!!session && session.status !== 'terminated'}
-              disabled={isLoading || session?.status === 'terminated'}
+              hasActiveSession={!!session && session.status !== 'inactive'}
+              disabled={isLoading || session?.status === 'inactive'}
               placeholder={
-                session?.status === 'terminated'
-                  ? 'Session terminated - cannot send messages'
+                session?.status === 'inactive'
+                  ? 'Session closed - cannot send messages'
                   : 'Type your message... (Shift+Enter for new line)'
               }
               autoFocus={true}

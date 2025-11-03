@@ -16,7 +16,7 @@ interface _AssistantSessionsReturn {
 
 /**
  * Hook for fetching chat sessions for a worker.
- * Returns all sessions (active, idle, terminated) that belong to the worker.
+ * Returns all sessions (active, inactive) that belong to the worker.
  *
  * @param workerId - ID of the worker to fetch sessions for, or null to fetch none
  * @returns Object containing sessions array and loading state
