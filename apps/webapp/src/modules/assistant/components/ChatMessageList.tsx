@@ -47,7 +47,7 @@ export function ChatMessageList({ messages }: ChatMessageListProps) {
 
   return (
     <ScrollArea className="h-full">
-      <div ref={scrollRef} className="space-y-4 p-6">
+      <div ref={scrollRef} className="space-y-4 p-6 pb-8">
         {messages.map((message) => (
           <ChatMessage key={message.id} message={message} />
         ))}

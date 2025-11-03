@@ -400,7 +400,7 @@ export function ChatInterface() {
           </div>
 
           {/* Input Area */}
-          <div className="border-t border-border p-4">
+          <div className="p-4 pt-6">
             <ChatInputWithModel
               onSendMessage={handleSendMessage}
               selectedModel={selectedModel}
