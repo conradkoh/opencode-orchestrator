@@ -1,6 +1,6 @@
-# Assistant Worker Runtime
+# OpenCode Orchestrator - Worker Service
 
-The worker runtime is a Node.js application that runs on a user's local machine to orchestrate OpenCode assistants. It connects to the Convex backend, manages multiple directory-bound workers (assistants), and processes chat sessions.
+The worker service is a Node.js application that runs on a user's local machine to orchestrate OpenCode AI assistants. It connects to the Convex backend, manages multiple directory-bound workers (assistants), and processes chat sessions.
 
 ## Architecture
 

@@ -1,7 +1,7 @@
 {
-  "name": "next-convex-starter-app",
+  "name": "opencode-orchestrator",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI assistant orchestration platform with OpenCode integration",
   "main": "index.js",
   "scripts": {
     "test": "nx run-many --target=test --projects=@workspace/webapp,@workspace/backend,@workspace/worker",
@@ -20,9 +20,15 @@
       "biome check --write --no-errors-on-unmatched"
     ]
   },
-  "keywords": [],
+  "keywords": [
+    "opencode",
+    "orchestrator",
+    "ai-assistant",
+    "convex",
+    "nextjs"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "2.1.2",
     "@nx/workspace": "21.4.1",

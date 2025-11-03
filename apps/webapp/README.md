@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OpenCode Orchestrator - Web Application
+
+The frontend web application for OpenCode Orchestrator, built with Next.js 15 and Convex.
+
+## Features
+
+- 🔐 **Authentication**: Google OAuth and anonymous login
+- 💬 **AI Chat Interface**: Real-time chat with OpenCode assistants
+- 👥 **Session Management**: Create and manage multiple chat sessions
+- 🎨 **Dark Mode**: Fully themed UI with light/dark mode support
+- 📊 **Admin Dashboard**: System administration and configuration
+- 📱 **PWA Support**: Progressive web app capabilities
+- 🔄 **Real-time Updates**: Live data synchronization via Convex
 
 ## Getting Started
 
-First, run the development server:
+### Running from Root
+
+The recommended way to run the application is from the project root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# From project root
+pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+This will start both the webapp at http://localhost:3000 and the Convex backend.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Running Standalone
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+If you need to run just the webapp:
 
-## Learn More
+```bash
+# From apps/webapp directory
+cd apps/webapp
+pnpm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+> **Note**: Ensure the Convex backend is running separately when using standalone mode.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+apps/webapp/
+├── src/
+│   ├── app/                    # Next.js app router pages
+│   │   ├── app/                # Main application pages
+│   │   ├── login/              # Authentication pages
+│   │   ├── test/               # Test/demo pages
+│   │   └── layout.tsx          # Root layout
+│   ├── components/             # Reusable UI components (ShadCN)
+│   ├── modules/                # Feature modules
+│   │   ├── admin/              # Admin dashboard
+│   │   ├── assistant/          # AI assistant chat
+│   │   ├── auth/               # Authentication
+│   │   ├── attendance/         # Attendance tracking
+│   │   ├── checklist/          # Checklist features
+│   │   ├── discussion/         # Discussion forums
+│   │   ├── presentation/       # Presentation mode
+│   │   └── theme/              # Theme management
+│   └── lib/                    # Utilities and helpers
+├── public/                     # Static assets
+└── package.json
+```
 
-## Deploy on Vercel
+## Technology Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework**: Next.js 15 (App Router)
+- **UI Components**: ShadCN UI with Radix UI primitives
+- **Styling**: Tailwind CSS v4
+- **Backend**: Convex (real-time database and serverless functions)
+- **Authentication**: Session-based with convex-helpers
+- **Icons**: Lucide React, Radix Icons, React Icons
+- **Forms**: React Hook Form with Zod validation
+- **State Management**: Convex reactive queries
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Development Guidelines
+
+See the [Frontend Development Guidelines](../../.cursor/rules) for coding standards and best practices, including:
+
+- Dark mode implementation patterns
+- ShadCN component usage
+- Authentication patterns with session helpers
+- Feature flag configuration
+
+## Building
+
+```bash
+# Type checking
+pnpm run typecheck
+
+# Production build
+pnpm run build
+
+# Start production server
+pnpm run start
+```
+
+## Deployment
+
+See the [root README](../../README.md#deployment) for deployment instructions covering both Convex backend and Vercel frontend deployment.

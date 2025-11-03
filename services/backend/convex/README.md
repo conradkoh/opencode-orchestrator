@@ -1,90 +1,122 @@
-# Welcome to your Convex functions directory!
+# OpenCode Orchestrator - Convex Backend
 
-Write your Convex functions here.
-See https://docs.convex.dev/functions for more.
+This directory contains the Convex backend functions and schema for OpenCode Orchestrator.
 
-A query function that takes two arguments looks like:
+## Overview
+
+The Convex backend provides:
+- 🔐 **Authentication**: Session-based auth with Google OAuth and anonymous login
+- 💬 **Chat Management**: Real-time chat sessions and message handling
+- 🤖 **Worker Orchestration**: Machine registration and worker lifecycle management
+- 📋 **Feature Modules**: Attendance, checklists, discussions, presentations
+- 🔄 **Real-time Sync**: Reactive queries and subscriptions
+
+## Structure
+
+```
+convex/
+├── _generated/           # Auto-generated Convex types
+├── auth/                 # Authentication functions
+│   └── google.ts         # Google OAuth implementation
+├── system/               # System-level functions
+│   └── auth/             # System auth helpers
+├── types/                # Shared types
+│   └── sessionIds.ts     # Session ID types
+├── lib/                  # Shared utilities
+├── auth.ts               # Authentication API
+├── chat.ts               # Chat session management
+├── workers.ts            # Worker management
+├── machines.ts           # Machine registration
+├── workerActions.ts      # Worker action handlers
+├── workerModels.ts       # Worker data models
+├── attendance.ts         # Attendance tracking
+├── checklists.ts         # Checklist features
+├── discussions.ts        # Discussion forums
+├── presentations.ts      # Presentation mode
+├── serviceDesk.ts        # Service desk features
+├── appinfo.ts            # Application info
+├── cleanupTasks.ts       # Maintenance tasks
+├── crypto.ts             # Cryptographic utilities
+├── migration.ts          # Data migrations
+└── schema.ts             # Database schema
+```
+
+## Key Features
+
+### Authentication
+- Session-based authentication using `convex-helpers/server/sessions`
+- All authenticated functions require `SessionIdArg`
+- Google OAuth and anonymous login support
+- System admin access levels
+
+### Chat System
+- Real-time chat sessions with OpenCode assistants
+- Message streaming and chunking
+- Session state management
+- Worker routing and coordination
+
+### Worker Management
+- Secure machine registration with tokens
+- Worker lifecycle tracking (idle, active, offline)
+- State synchronization with worker processes
+- Graceful shutdown handling
+
+## Development
+
+### Running the Backend
+
+```bash
+# From services/backend
+pnpm run dev
+
+# Or from project root
+pnpm run dev
+```
+
+### Testing
+
+```bash
+# Run tests
+pnpm test
+
+# Watch mode
+pnpm test:watch
+
+# Type checking
+pnpm typecheck
+```
+
+### Deployment
+
+```bash
+# Deploy to Convex production
+pnpm run deploy
+```
+
+See [root README](../../../README.md#deployment) for complete deployment instructions.
+
+## Authentication Conventions
+
+All queries/mutations requiring authentication must use `SessionIdArg`:
 
 ```ts
-// functions.js
+import { SessionIdArg } from "convex-helpers/server/sessions";
 import { query } from "./_generated/server";
-import { v } from "convex/values";
 
-export const myQueryFunction = query({
-  // Validators for arguments.
+export const myAuthQuery = query({
   args: {
-    first: v.number(),
-    second: v.string(),
+    ...SessionIdArg,
+    // other args
   },
-
-  // Function implementation.
   handler: async (ctx, args) => {
-    // Read the database as many times as you need here.
-    // See https://docs.convex.dev/database/reading-data.
-    const documents = await ctx.db.query("tablename").collect();
-
-    // Arguments passed from the client are properties of the args object.
-    console.log(args.first, args.second);
-
-    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
-    // remove non-public properties, or create new objects.
-    return documents;
+    // Implementation
   },
 });
 ```
 
-Using this query function in a React component looks like:
+## Learn More
 
-```ts
-const data = useQuery(api.functions.myQueryFunction, {
-  first: 10,
-  second: "hello",
-});
-```
-
-A mutation function looks like:
-
-```ts
-// functions.js
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
-
-export const myMutationFunction = mutation({
-  // Validators for arguments.
-  args: {
-    first: v.string(),
-    second: v.string(),
-  },
-
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Insert or modify documents in the database here.
-    // Mutations can also read from the database like queries.
-    // See https://docs.convex.dev/database/writing-data.
-    const message = { body: args.first, author: args.second };
-    const id = await ctx.db.insert("messages", message);
-
-    // Optionally, return a value from your mutation.
-    return await ctx.db.get(id);
-  },
-});
-```
-
-Using this mutation function in a React component looks like:
-
-```ts
-const mutation = useMutation(api.functions.myMutationFunction);
-function handleButtonPress() {
-  // fire and forget, the most common way to use mutations
-  mutation({ first: "Hello!", second: "me" });
-  // OR
-  // use the result once the mutation has completed
-  mutation({ first: "Hello!", second: "me" }).then((result) =>
-    console.log(result),
-  );
-}
-```
-
-Use the Convex CLI to push your functions to a deployment. See everything
-the Convex CLI can do by running `npx convex -h` in your project root
-directory. To learn more, launch the docs with `npx convex docs`.
+- [Convex Documentation](https://docs.convex.dev)
+- [Convex Functions](https://docs.convex.dev/functions)
+- [Convex Schema](https://docs.convex.dev/database/schemas)
+- [Convex Helpers](https://github.com/get-convex/convex-helpers)
