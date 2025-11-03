@@ -18,18 +18,18 @@ export class ShutdownHandler implements IShutdownHandler {
     console.log('🛑 Shutting down worker...');
 
     try {
-      // Disconnect chat sessions if manager exists
+      // Disconnect chat sessions first (before Convex to avoid race conditions)
       if (chatManager) {
         console.log('💬 Disconnecting chat sessions...');
-        // TODO: Add disconnectAll method to ChatSessionManager
+        await chatManager.disconnectAll();
         console.log('✅ Chat sessions disconnected');
       }
 
-      // Disconnect from Convex if client exists
+      // Disconnect from Convex and set worker offline
       if (convexClient) {
-        console.log('📡 Disconnecting from Convex...');
+        console.log('📡 Disconnecting from Convex and marking worker offline...');
         await convexClient.disconnect();
-        console.log('✅ Convex disconnected');
+        console.log('✅ Convex disconnected and worker marked offline');
       }
 
       console.log('✅ Shutdown complete');
