@@ -611,7 +611,7 @@ export const markConnected = mutation({
     for (const session of activeSessions) {
       await ctx.db.patch(session._id, {
         status: 'idle',
-        opencodeSessionId: null, // Clear the old OpenCode session ID
+        opencodeSessionId: undefined, // Clear the old OpenCode session ID
       });
       invalidatedCount++;
     }
