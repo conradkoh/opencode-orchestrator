@@ -1,4 +1,4 @@
-import type { ChatSessionId, OpencodeSessionId } from '@backend/convex/types/sessionIds';
+import type { ChatSessionId, OpencodeSessionId } from '@workspace/backend/convex/types/sessionIds';
 
 /**
  * Clean, focused sync component for OpenCode <-> Convex integration.
