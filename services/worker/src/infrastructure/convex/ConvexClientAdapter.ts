@@ -284,36 +284,31 @@ export class ConvexClientAdapter {
       (messages) => {
         if (!messages) return;
 
-        // On first load, mark all existing messages as processed
-        // EXCEPT incomplete assistant messages (these need processing)
+        // On first load, mark ALL existing messages as processed (including incomplete ones)
+        // We don't retry incomplete messages from before the worker restart
         if (!messagesInitialized) {
           for (const message of messages) {
             const messageKey = `${message.sessionId}:${message.messageId}`;
-
-            // Mark user messages as processed (don't reprocess old messages)
-            if (message.role === 'user' && message.completed) {
-              processedMessages.add(messageKey);
-            }
-
-            // Mark completed assistant messages as processed
-            if (message.role === 'assistant' && message.completed) {
-              processedMessages.add(messageKey);
-            }
+            // Mark ALL messages as processed (don't retry old messages)
+            processedMessages.add(messageKey);
           }
 
           console.log(`📋 Marked ${processedMessages.size} existing messages as processed`);
 
-          // Now check for any incomplete assistant messages that need processing
+          // Check for incomplete messages (for logging only, we don't retry them)
           const incompleteAssistantMessages = messages.filter(
             (m) => m.role === 'assistant' && !m.completed
           );
 
           if (incompleteAssistantMessages.length > 0) {
             console.log(
-              `⚠️  Found ${incompleteAssistantMessages.length} incomplete assistant messages`
+              `ℹ️  Found ${incompleteAssistantMessages.length} incomplete assistant messages from before restart`
+            );
+            console.log(
+              'ℹ️  These messages will NOT be reprocessed. They may have failed for a reason.'
             );
 
-            // For each incomplete assistant message, find the user message and process it
+            // Just log them for debugging, don't process
             for (const assistantMsg of incompleteAssistantMessages) {
               const userMessage = messages.find(
                 (m) =>
@@ -324,19 +319,9 @@ export class ConvexClientAdapter {
               );
 
               if (userMessage) {
-                console.log(`🔄 Reprocessing incomplete message: ${assistantMsg.messageId}`);
-
-                if (this.messageCallback) {
-                  // Cast to branded type
-                  const chatSessionId = assistantMsg.sessionId as ChatSessionId;
-                  this.messageCallback(
-                    chatSessionId,
-                    assistantMsg.messageId,
-                    userMessage.content
-                  ).catch((error) => {
-                    console.error('❌ Error in message callback:', error);
-                  });
-                }
+                console.log(
+                  `   - Message ${assistantMsg.messageId} in session ${assistantMsg.sessionId}`
+                );
               }
             }
           }

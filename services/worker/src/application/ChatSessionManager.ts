@@ -22,6 +22,7 @@ export class ChatSessionManager {
   private workingDirectory: string;
   private syncInterval: NodeJS.Timeout | null = null;
   private readonly SYNC_INTERVAL_MS = 30000; // 30 seconds
+  private defaultModel: string | null = null; // Store default model from initial fetch
 
   constructor(convexClient: ConvexClientAdapter, workingDirectory: string) {
     this.convexClient = convexClient;
@@ -52,6 +53,9 @@ export class ChatSessionManager {
     try {
       console.log('📋 Fetching available models from opencode...');
       const models = await this.opencodeAdapter.listModels(this.opencodeClient);
+
+      // Store default model for sync operations
+      this.defaultModel = models.length > 0 ? models[0].id : null;
 
       // Log detailed model information
       console.log(`✅ Found ${models.length} models:`);
@@ -254,20 +258,40 @@ export class ChatSessionManager {
   /**
    * Restore active sessions from Convex after worker restart.
    * Attempts to match existing OpenCode sessions or creates new ones.
+   * Limited to 50 most recent sessions for performance.
    */
   private async restoreActiveSessions(): Promise<void> {
+    const MAX_SESSIONS_TO_RESTORE = 50;
+
     try {
       console.log('🔄 Restoring active sessions from Convex...');
 
       // Get active sessions from Convex
-      const convexSessions = await this.convexClient.getActiveSessions();
+      const allConvexSessions = await this.convexClient.getActiveSessions();
 
-      if (convexSessions.length === 0) {
+      if (allConvexSessions.length === 0) {
         console.log('✅ No active sessions to restore');
         return;
       }
 
-      console.log(`📋 Found ${convexSessions.length} active session(s) to restore`);
+      console.log(`📋 Found ${allConvexSessions.length} active session(s) in database`);
+
+      // Sort by last activity (most recent first) and limit
+      const convexSessions = allConvexSessions
+        .filter((s) => !(s as any).deletedInOpencode) // Filter deleted first
+        .sort((a, b) => b.lastActivity - a.lastActivity)
+        .slice(0, MAX_SESSIONS_TO_RESTORE);
+
+      if (convexSessions.length < allConvexSessions.length) {
+        console.log(
+          `📋 Restoring ${convexSessions.length} most recent sessions (limit: ${MAX_SESSIONS_TO_RESTORE})`
+        );
+        console.log(
+          `ℹ️  ${allConvexSessions.length - convexSessions.length} older sessions will be loaded on-demand if needed`
+        );
+      } else {
+        console.log(`📋 Restoring all ${convexSessions.length} session(s)`);
+      }
 
       // List existing OpenCode sessions (if any)
       let opencodeSessions: Array<{ id: string }> = [];
@@ -280,17 +304,11 @@ export class ChatSessionManager {
         }
       }
 
-      // Restore each session (skip soft-deleted ones)
+      // Restore each session
       for (const convexSession of convexSessions) {
         try {
           const chatSessionId = convexSession.chatSessionId;
           const storedOpencodeSessionId = convexSession.opencodeSessionId;
-
-          // Skip soft-deleted sessions
-          if ((convexSession as any).deletedInOpencode) {
-            console.log(`⏭️  Skipping soft-deleted session ${chatSessionId}`);
-            continue;
-          }
 
           // Strategy 1: Use stored OpenCode session ID if available
           if (
@@ -427,13 +445,12 @@ export class ChatSessionManager {
         },
 
         createSyncedSession: async (opencodeSessionId, title) => {
-          // Infer model (default to first available model)
-          const models = await this.opencodeAdapter.listModels(this.opencodeClient!);
-          const defaultModel = models.length > 0 ? models[0].id : 'unknown';
+          // Use the default model stored during initialization
+          const model = this.defaultModel || 'unknown';
 
           const chatSessionId = await this.convexClient.createSyncedSession(
             opencodeSessionId as OpencodeSessionId,
-            defaultModel,
+            model,
             title
           );
 
@@ -441,7 +458,7 @@ export class ChatSessionManager {
           this.activeSessions.set(chatSessionId, {
             chatSessionId,
             opencodeSessionId: opencodeSessionId as OpencodeSessionId,
-            model: defaultModel,
+            model,
             startedAt: Date.now(),
             isInitializing: false,
           });
