@@ -481,9 +481,12 @@ export class ConvexClientAdapter {
 
   /**
    * Mark worker as connected after successful opencode initialization.
+   * Also invalidates all active sessions from previous worker instance.
+   *
+   * @returns Result with count of sessions invalidated
    */
-  async markConnected(): Promise<void> {
-    await this.httpClient.mutation(api.workers.markConnected, {
+  async markConnected(): Promise<{ success: boolean; sessionsInvalidated: number }> {
+    return await this.httpClient.mutation(api.workers.markConnected, {
       workerId: this.config.workerId,
       machineId: this.config.machineId,
       secret: this.config.secret,

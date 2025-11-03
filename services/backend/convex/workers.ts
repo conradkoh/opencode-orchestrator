@@ -560,10 +560,14 @@ export const requestConnect = mutation({
  * Mark worker as connected after opencode initialization completes.
  * Called by worker after successfully connecting opencode client.
  *
+ * When a worker restarts, this also marks all its active sessions as 'idle'
+ * since the OpenCode sessions are lost on restart. Users will need to start
+ * new sessions after a worker restart.
+ *
  * @param workerId - Worker ID
  * @param machineId - Machine ID
  * @param secret - Cryptographic secret from token
- * @returns Success status
+ * @returns Success status and count of sessions invalidated
  */
 export const markConnected = mutation({
   args: {
@@ -594,8 +598,32 @@ export const markConnected = mutation({
       connectedAt: Date.now(),
     });
 
+    // Mark all active sessions for this worker as 'idle' since OpenCode sessions
+    // are lost on worker restart (no session resumption)
+    const activeSessions = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_worker_and_status', (q) =>
+        q.eq('workerId', args.workerId).eq('status', 'active')
+      )
+      .collect();
+
+    let invalidatedCount = 0;
+    for (const session of activeSessions) {
+      await ctx.db.patch(session._id, {
+        status: 'idle',
+        opencodeSessionId: null, // Clear the old OpenCode session ID
+      });
+      invalidatedCount++;
+    }
+
     console.log('[workers.markConnected] Worker marked as connected:', args.workerId);
-    return { success: true };
+    if (invalidatedCount > 0) {
+      console.log(
+        `[workers.markConnected] Invalidated ${invalidatedCount} active session(s) from previous worker instance`
+      );
+    }
+
+    return { success: true, sessionsInvalidated: invalidatedCount };
   },
 });
 

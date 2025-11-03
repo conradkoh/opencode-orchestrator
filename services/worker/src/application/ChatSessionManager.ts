@@ -3,7 +3,6 @@ import type { IOpencodeInstance } from '../domain/interfaces/IOpencodeClient';
 import { validateSessionId } from '../domain/valueObjects/Ids';
 import type { ConvexClientAdapter } from '../infrastructure/convex/ConvexClientAdapter';
 import { OpencodeClientAdapter } from '../infrastructure/opencode/OpencodeClientAdapter';
-import { executeSync, type SyncDependencies } from './OpencodeConvexSync';
 
 /**
  * Manages chat session lifecycle and opencode process management.
@@ -20,9 +19,6 @@ export class ChatSessionManager {
   private opencodeClient: IOpencodeInstance | null = null;
   private activeSessions: Map<ChatSessionId, SessionInfo> = new Map();
   private workingDirectory: string;
-  private syncInterval: NodeJS.Timeout | null = null;
-  private readonly SYNC_INTERVAL_MS = 30000; // 30 seconds
-  private defaultModel: string | null = null; // Store default model from initial fetch
 
   constructor(convexClient: ConvexClientAdapter, workingDirectory: string) {
     this.convexClient = convexClient;
@@ -32,9 +28,10 @@ export class ChatSessionManager {
 
   /**
    * Connect and initialize opencode client.
-   * This should be called when a worker is selected in the UI.
-   * Initializes the opencode client, fetches available models, and publishes them to Convex.
-   * Also restores any active sessions from Convex and syncs with OpenCode.
+   * Initializes the opencode client, fetches available models, publishes them to Convex,
+   * and invalidates any active sessions from a previous worker instance.
+   *
+   * Sessions are NOT restored on restart - users must start new sessions.
    *
    * @returns Promise that resolves when connection is complete
    */
@@ -54,9 +51,6 @@ export class ChatSessionManager {
       console.log('📋 Fetching available models from opencode...');
       const models = await this.opencodeAdapter.listModels(this.opencodeClient);
 
-      // Store default model for sync operations
-      this.defaultModel = models.length > 0 ? models[0].id : null;
-
       // Log detailed model information
       console.log(`✅ Found ${models.length} models:`);
       for (const model of models) {
@@ -68,15 +62,16 @@ export class ChatSessionManager {
       await this.convexClient.publishModels(models);
       console.log('✅ Models published to Convex successfully');
 
-      // Mark worker as connected
-      await this.convexClient.markConnected();
+      // Mark worker as connected and invalidate old sessions
+      const result = await this.convexClient.markConnected();
       console.log('✅ Worker marked as connected');
 
-      // Sync sessions with OpenCode
-      await this.syncSessionsWithOpencode();
-
-      // Start periodic sync (every 30 seconds)
-      this.startPeriodicSync();
+      if (result.sessionsInvalidated && result.sessionsInvalidated > 0) {
+        console.log(
+          `ℹ️  Invalidated ${result.sessionsInvalidated} session(s) from previous worker instance`
+        );
+        console.log('ℹ️  Users will need to start new chat sessions');
+      }
     } catch (error) {
       console.error('❌ Failed to fetch/publish models:', error);
       throw error; // Fail connection if we can't get models
@@ -131,8 +126,6 @@ export class ChatSessionManager {
         session.isInitializing = false;
       }
 
-      // Mark session as ready and store OpenCode session ID in Convex
-      await this.convexClient.sessionReady(chatSessionId, opencodeSessionId);
       console.log(`✅ Session ${chatSessionId} ready (OpenCode: ${opencodeSessionId})`);
     } catch (error) {
       console.error(`❌ Failed to start session ${chatSessionId}:`, error);
@@ -260,124 +253,11 @@ export class ChatSessionManager {
   }
 
   /**
-   * Start periodic session synchronization with OpenCode.
-   */
-  private startPeriodicSync(): void {
-    if (this.syncInterval) {
-      return; // Already running
-    }
-
-    console.log('🔄 Starting periodic session sync...');
-    this.syncInterval = setInterval(async () => {
-      try {
-        await this.syncSessionsWithOpencode();
-      } catch (error) {
-        console.error(
-          '❌ Periodic sync failed:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    }, this.SYNC_INTERVAL_MS);
-  }
-
-  /**
-   * Stop periodic session synchronization.
-   */
-  private stopPeriodicSync(): void {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = null;
-      console.log('✅ Periodic sync stopped');
-    }
-  }
-
-  /**
-   * Sync sessions between Convex and OpenCode.
-   * Uses the OpencodeConvexSync component for clean, testable, idempotent sync logic.
-   */
-  private async syncSessionsWithOpencode(): Promise<void> {
-    if (!this.opencodeClient) {
-      console.warn('⚠️  Cannot sync: OpenCode client not initialized');
-      return;
-    }
-
-    try {
-      // Create sync dependencies that adapt our infrastructure to the sync component
-      const syncDeps: SyncDependencies = {
-        fetchOpencodeSessions: async () => {
-          if (!this.opencodeClient) {
-            return [];
-          }
-          const sessions = await this.opencodeAdapter.listSessions(this.opencodeClient);
-          return sessions.map((s) => ({ id: s.id, title: s.title }));
-        },
-
-        fetchConvexSessions: async () => {
-          const sessions = await this.convexClient.getActiveSessions();
-          return sessions.map((s) => ({
-            chatSessionId: s.chatSessionId,
-            opencodeSessionId: s.opencodeSessionId,
-            name: s.name,
-            deletedInOpencode: s.deletedInOpencode,
-          }));
-        },
-
-        updateSessionName: async (chatSessionId, name) => {
-          await this.convexClient.updateSessionName(chatSessionId, name);
-        },
-
-        markSessionDeleted: async (chatSessionId) => {
-          await this.convexClient.markSessionDeletedInOpencode(chatSessionId);
-          // Also remove from active sessions in memory
-          this.activeSessions.delete(chatSessionId);
-        },
-
-        createSyncedSession: async (opencodeSessionId, title) => {
-          // Use the default model stored during initialization
-          const model = this.defaultModel || 'unknown';
-
-          const chatSessionId = await this.convexClient.createSyncedSession(
-            opencodeSessionId as OpencodeSessionId,
-            model,
-            title
-          );
-
-          // Add to active sessions in memory
-          this.activeSessions.set(chatSessionId, {
-            chatSessionId,
-            opencodeSessionId: opencodeSessionId as OpencodeSessionId,
-            model,
-            startedAt: Date.now(),
-            isInitializing: false,
-          });
-
-          return chatSessionId;
-        },
-
-        recordSyncTimestamp: async (timestamp) => {
-          await this.convexClient.updateLastSyncTimestamp(timestamp);
-        },
-      };
-
-      // Execute the clean, tested sync logic
-      await executeSync(syncDeps);
-    } catch (error) {
-      console.error(
-        '❌ Failed to sync sessions:',
-        error instanceof Error ? error.message : String(error)
-      );
-    }
-  }
-
-  /**
    * Disconnect all active sessions and cleanup resources.
    * Called during graceful shutdown.
    */
   async disconnectAll(): Promise<void> {
     console.log(`🔌 Disconnecting ${this.activeSessions.size} active session(s)...`);
-
-    // Stop periodic sync
-    this.stopPeriodicSync();
 
     // Close all active sessions
     const sessionIds = Array.from(this.activeSessions.keys());
