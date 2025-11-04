@@ -10,7 +10,6 @@
 import type { ChatSessionId, OpencodeSessionId } from '@workspace/backend/convex/types/sessionIds';
 import {
   type ConvexSession,
-  calculateSyncPlan,
   executeSync,
   type OpencodeSession,
   type SyncDependencies,
@@ -52,7 +51,7 @@ const mockConvexSessions: ConvexSession[] = [
   },
 ];
 
-const syncCounter = 0;
+const _syncCounter = 0;
 
 // ============================================================================
 // Mock Dependencies
@@ -176,7 +175,7 @@ async function main() {
   }
 
   // Test with no changes
-  console.log('\n\n' + '='.repeat(80));
+  console.log(`\n\n${'='.repeat(80)}`);
   console.log('🧪 Testing with no changes (simulating immediate restart)');
   console.log('='.repeat(80));
 
@@ -186,7 +185,7 @@ async function main() {
     console.log('\n✅ PERFECT: Immediate restart also produces no changes!');
   }
 
-  console.log('\n' + '='.repeat(80));
+  console.log(`\n${'='.repeat(80)}`);
   console.log('🎉 All idempotency tests passed!');
   console.log('='.repeat(80));
 }

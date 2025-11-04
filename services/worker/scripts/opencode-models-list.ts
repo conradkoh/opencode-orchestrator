@@ -98,10 +98,10 @@ async function main() {
     if (error instanceof Error) {
       console.error('   Message:', error.message);
       if ('stdout' in error) {
-        console.error('   Stdout:', (error as any).stdout);
+        console.error('   Stdout:', (error as { stdout?: string }).stdout);
       }
       if ('stderr' in error) {
-        console.error('   Stderr:', (error as any).stderr);
+        console.error('   Stderr:', (error as { stderr?: string }).stderr);
       }
     }
     process.exit(1);
