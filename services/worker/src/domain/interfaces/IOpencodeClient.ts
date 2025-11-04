@@ -151,6 +151,18 @@ export interface IOpencodeClient {
   getSession(client: IOpencodeInstance, sessionId: SessionId): Promise<OpencodeSessionInfo>;
 
   /**
+   * Rename/update a session title in OpenCode.
+   *
+   * @param client - OpenCode client instance
+   * @param sessionId - Session ID to rename
+   * @param title - New session title
+   * @throws Error if rename fails
+   *
+   * @see https://opencode.ai/docs/sdk/#sessions
+   */
+  renameSession(client: IOpencodeInstance, sessionId: string, title: string): Promise<void>;
+
+  /**
    * Sends a prompt to a session and streams the response.
    * Returns an async iterable iterator that yields structured response chunks.
    *

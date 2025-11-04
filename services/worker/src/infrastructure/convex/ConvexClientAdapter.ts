@@ -482,6 +482,17 @@ export class ConvexClientAdapter {
   }
 
   /**
+   * Get session name for a specific session.
+   * Used to check if a session has been auto-named.
+   */
+  async getSessionName(chatSessionId: ChatSessionId): Promise<string | null> {
+    return await this.httpClient.query(api.chat.getSessionName, {
+      chatSessionId,
+      workerId: this.config.workerId,
+    });
+  }
+
+  /**
    * Get last sync timestamp for incremental syncing.
    */
   async getLastSyncTimestamp(): Promise<number | null> {

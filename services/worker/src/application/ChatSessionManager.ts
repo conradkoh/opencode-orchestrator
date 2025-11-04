@@ -198,12 +198,50 @@ export class ChatSessionManager {
 
           // Notify Convex that session is ready
           await this.convexClient.sessionReady(chatSessionId, opencodeSessionId);
+
+          // Check if Convex session has a name and rename OpenCode session immediately
+          const sessionName = await this.convexClient.getSessionName(chatSessionId);
+          if (sessionName) {
+            try {
+              await this.opencodeAdapter.renameSession(
+                this.opencodeClient,
+                opencodeSessionId,
+                sessionName
+              );
+              console.log(`✅ Renamed OpenCode session ${opencodeSessionId} to: ${sessionName}`);
+            } catch (renameError) {
+              // Non-fatal: log but don't fail the message processing
+              console.warn(
+                `⚠️  Failed to rename OpenCode session: ${renameError instanceof Error ? renameError.message : String(renameError)}`
+              );
+            }
+          }
         } catch (error) {
           session.isInitializing = false;
           const errorMsg = `Failed to create OpenCode session: ${error instanceof Error ? error.message : String(error)}`;
           console.error(`❌ ${errorMsg}`);
           await this.writeError(chatSessionId, messageId, errorMsg);
           return;
+        }
+      } else {
+        // Session already exists - check if name was updated and rename if needed
+        const sessionName = await this.convexClient.getSessionName(chatSessionId);
+        if (sessionName) {
+          try {
+            await this.opencodeAdapter.renameSession(
+              this.opencodeClient,
+              session.opencodeSessionId,
+              sessionName
+            );
+            console.log(
+              `✅ Renamed existing OpenCode session ${session.opencodeSessionId} to: ${sessionName}`
+            );
+          } catch (renameError) {
+            // Non-fatal: log but don't fail the message processing
+            console.warn(
+              `⚠️  Failed to rename OpenCode session: ${renameError instanceof Error ? renameError.message : String(renameError)}`
+            );
+          }
         }
       }
 

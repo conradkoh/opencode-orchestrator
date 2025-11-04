@@ -6,6 +6,24 @@ import { mutation, query } from './_generated/server';
 import type { ChatSessionId, OpencodeSessionId } from './types/sessionIds';
 
 /**
+ * Generate a session name from user prompt.
+ * Takes first 50 characters, cleans whitespace, adds "..." if truncated.
+ *
+ * @param prompt - User's message content
+ * @returns Generated session name
+ */
+function generateSessionName(prompt: string): string {
+  const cleaned = prompt.trim().replace(/\s+/g, ' ');
+  if (cleaned.length === 0) {
+    return 'New Chat';
+  }
+  if (cleaned.length <= 50) {
+    return cleaned;
+  }
+  return `${cleaned.substring(0, 50).trim()}...`;
+}
+
+/**
  * Start a new chat session with a worker.
  * Creates a session record and notifies the worker to initialize.
  * Model is no longer required - it will be specified with each message.
@@ -189,6 +207,22 @@ export const sendMessage = mutation({
       });
 
       console.log('[sendMessage] Resumed session, closed', activeSessions.length, 'other sessions');
+    }
+
+    // Auto-name session: If this is the first user message, generate a name from the prompt
+    const existingUserMessages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
+      .filter((q) => q.eq(q.field('role'), 'user'))
+      .collect();
+
+    if (existingUserMessages.length === 0 && !session.name) {
+      const sessionName = generateSessionName(args.content);
+      console.log('[sendMessage] Auto-naming session:', sessionName);
+      await ctx.db.patch(session._id, {
+        name: sessionName,
+        lastActivity: timestamp,
+      });
     }
 
     // Create user message with model
@@ -469,6 +503,39 @@ export const getActiveSessions = query({
 });
 
 /**
+ * Get session name for a specific session (worker-only query).
+ * Used to check if a session has been auto-named so we can rename the OpenCode session.
+ *
+ * @param chatSessionId - Session ID to get name for
+ * @param workerId - Worker ID (for authorization)
+ * @returns Session name or null if not found
+ */
+export const getSessionName = query({
+  args: {
+    chatSessionId: v.string(),
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find session
+    const session = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
+      .first();
+
+    if (!session) {
+      return null;
+    }
+
+    // Verify worker owns this session
+    if (session.workerId !== args.workerId) {
+      return null;
+    }
+
+    return session.name || null;
+  },
+});
+
+/**
  * Get last sync timestamp for a worker.
  * Used to enable incremental syncing.
  *
@@ -621,6 +688,7 @@ export const listSessions = query({
     return sessions.map((session) => ({
       sessionId: session.sessionId,
       workerId: session.workerId,
+      name: session.name,
       model: session.model,
       status: session.status,
       createdAt: session.createdAt,

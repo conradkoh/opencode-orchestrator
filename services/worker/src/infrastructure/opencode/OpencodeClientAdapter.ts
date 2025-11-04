@@ -293,6 +293,39 @@ export class OpencodeClientAdapter implements IOpencodeClient {
   }
 
   /**
+   * Rename/update a session title in OpenCode.
+   *
+   * @param client - OpenCode client instance
+   * @param sessionId - Session ID to rename
+   * @param title - New session title
+   * @throws Error if rename fails
+   */
+  async renameSession(client: IOpencodeInstance, sessionId: string, title: string): Promise<void> {
+    try {
+      const instance = client as OpencodeInstanceInternal;
+      const sdkClient = instance._internal.client;
+      const directory = instance._internal.directory;
+
+      // SDK: client.session.update({ path: { id }, body: { title? }, query?: { directory? } })
+      await sdkClient.session.update({
+        path: { id: sessionId },
+        body: {
+          title,
+        },
+        query: {
+          directory,
+        },
+      });
+
+      console.log(`✅ Renamed OpenCode session ${sessionId} to: ${title}`);
+    } catch (error) {
+      throw new Error(
+        `Failed to rename OpenCode session: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
    * Sends a prompt to a session and streams the response.
    * Returns an async iterable iterator that yields structured response chunks.
    *

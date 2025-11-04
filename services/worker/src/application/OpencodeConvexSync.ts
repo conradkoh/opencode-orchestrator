@@ -176,6 +176,7 @@ export interface SyncDependencies {
   markSessionDeleted: (chatSessionId: ChatSessionId) => Promise<void>;
   createSyncedSession: (opencodeSessionId: string, title?: string) => Promise<ChatSessionId>;
   recordSyncTimestamp: (timestamp: number) => Promise<void>;
+  renameOpenCodeSession: (opencodeSessionId: OpencodeSessionId, title: string) => Promise<void>;
 }
 
 /**
@@ -225,19 +226,28 @@ export async function executeSync(deps: SyncDependencies): Promise<SyncResult> {
 
     // Name updates
     for (const update of plan.nameUpdates) {
+      // Find the OpenCode session ID for this Convex session
+      const convexSession = convexSessions.find((s) => s.chatSessionId === update.chatSessionId);
+      const opencodeSessionId = convexSession?.opencodeSessionId;
+
       operations.push(
-        deps
-          .updateSessionName(update.chatSessionId, update.newName)
-          .then(() => {
-            result.nameUpdates++;
-            console.log(`📝 Updated: ${update.chatSessionId} → "${update.newName}"`);
-          })
-          .catch((error) => {
-            result.errors.push({
-              operation: `updateName:${update.chatSessionId}`,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          })
+        (async () => {
+          // Update in Convex first
+          await deps.updateSessionName(update.chatSessionId, update.newName);
+
+          // Then update in OpenCode if we have the session ID
+          if (opencodeSessionId) {
+            await deps.renameOpenCodeSession(opencodeSessionId, update.newName);
+          }
+
+          result.nameUpdates++;
+          console.log(`📝 Updated: ${update.chatSessionId} → "${update.newName}"`);
+        })().catch((error) => {
+          result.errors.push({
+            operation: `updateName:${update.chatSessionId}`,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
       );
     }
 

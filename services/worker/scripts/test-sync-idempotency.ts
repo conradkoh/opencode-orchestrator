@@ -94,6 +94,14 @@ const mockDeps: SyncDependencies = {
   async recordSyncTimestamp(timestamp: number) {
     console.log(`📅 Recorded sync timestamp: ${new Date(timestamp).toISOString()}`);
   },
+
+  async renameOpenCodeSession(opencodeSessionId: OpencodeSessionId, title: string) {
+    const ocSession = mockOpencodeSessions.find((s) => s.id === opencodeSessionId);
+    if (ocSession) {
+      ocSession.title = title;
+      console.log(`✏️  Renamed OpenCode session ${opencodeSessionId} to: ${title}`);
+    }
+  },
 };
 
 // ============================================================================

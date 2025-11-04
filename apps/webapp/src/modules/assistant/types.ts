@@ -143,6 +143,8 @@ export interface ChatSession {
   sessionId: string;
   /** ID of the worker handling this session */
   workerId: string;
+  /** Session name/title (auto-generated from first message or synced from OpenCode) */
+  name?: string;
   /** AI model (deprecated - model is now stored per-message) */
   model?: string;
   /** Current status of the session */
