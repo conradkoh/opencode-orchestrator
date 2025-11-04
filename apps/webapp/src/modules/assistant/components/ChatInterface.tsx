@@ -521,12 +521,8 @@ export function ChatInterface() {
               selectedModel={selectedModel}
               availableModels={availableModels}
               onModelChange={handleModelChange}
-              disabled={isLoading || session?.status === 'inactive'}
-              placeholder={
-                session?.status === 'inactive'
-                  ? 'Session closed - cannot send messages'
-                  : 'Type your message... (Shift+Enter for new line)'
-              }
+              disabled={isLoading}
+              placeholder="Type your message... (Shift+Enter for new line)"
               autoFocus={true}
             />
           </div>

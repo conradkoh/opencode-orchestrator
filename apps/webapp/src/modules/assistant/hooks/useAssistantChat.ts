@@ -204,6 +204,9 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
    * Sends a message to the active session with the specified model.
    * The response will be streamed via subscriptions.
    * Each message stores the model for audit trail purposes.
+   *
+   * If the session is inactive, the backend will automatically resume it
+   * and close other active sessions for the same worker.
    */
   const sendMessage = useCallback(
     async (content: string, model: string) => {
@@ -215,6 +218,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
       try {
         console.log('[useAssistantChat] Sending message with model:', model);
         // Send message with model - backend will create user message and assistant placeholder
+        // If session is inactive, backend will auto-resume it
         await sendMessageMutation({ chatSessionId: activeSessionId, content, model });
         // Worker will receive notification and start processing
         // Chunks will arrive via subscribeToChunks subscription

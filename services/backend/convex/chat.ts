@@ -160,12 +160,36 @@ export const sendMessage = mutation({
       throw new Error('Unauthorized: You do not own this session');
     }
 
-    // Verify session is active
-    if (session.status !== 'active') {
-      throw new Error('Session is not active');
-    }
-
     const timestamp = Date.now();
+
+    // Auto-resume: If session is inactive, reactivate it and close other active sessions
+    if (session.status === 'inactive') {
+      console.log('[sendMessage] Auto-resuming inactive session:', args.chatSessionId);
+
+      // Get all active sessions for the same worker
+      const activeSessions = await ctx.db
+        .query('chatSessions')
+        .withIndex('by_worker_and_status', (q) =>
+          q.eq('workerId', session.workerId).eq('status', 'active')
+        )
+        .collect();
+
+      // Mark all other active sessions as inactive
+      for (const activeSession of activeSessions) {
+        await ctx.db.patch(activeSession._id, {
+          status: 'inactive',
+          lastActivity: timestamp,
+        });
+      }
+
+      // Mark this session as active
+      await ctx.db.patch(session._id, {
+        status: 'active',
+        lastActivity: timestamp,
+      });
+
+      console.log('[sendMessage] Resumed session, closed', activeSessions.length, 'other sessions');
+    }
 
     // Create user message with model
     const userMessageId = nanoid();
