@@ -296,7 +296,7 @@ export class ConvexClientAdapter {
         // We don't retry incomplete messages from before the worker restart
         if (!messagesInitialized) {
           for (const message of messages) {
-            const messageKey = `${message.sessionId}:${message.messageId}`;
+            const messageKey = `${message.sessionId}:${message.id}`;
             // Mark ALL messages as processed (don't retry old messages)
             processedMessages.add(messageKey);
           }
@@ -327,9 +327,7 @@ export class ConvexClientAdapter {
               );
 
               if (userMessage) {
-                console.log(
-                  `   - Message ${assistantMsg.messageId} in session ${assistantMsg.sessionId}`
-                );
+                console.log(`   - Message ${assistantMsg.id} in session ${assistantMsg.sessionId}`);
               }
             }
           }
@@ -340,13 +338,13 @@ export class ConvexClientAdapter {
 
         // After initial load, process new user messages
         for (const message of messages) {
-          const messageKey = `${message.sessionId}:${message.messageId}`;
+          const messageKey = `${message.sessionId}:${message.id}`;
 
           if (!processedMessages.has(messageKey) && message.role === 'user' && message.completed) {
             processedMessages.add(messageKey);
             console.log(
               '📨 New user message detected:',
-              message.messageId,
+              message.id,
               'in session:',
               message.sessionId
             );
@@ -361,16 +359,16 @@ export class ConvexClientAdapter {
             );
 
             if (!assistantMessage) {
-              console.error('❌ No assistant message found for user message:', message.messageId);
+              console.error('❌ No assistant message found for user message:', message.id);
               continue;
             }
 
-            console.log('📝 Found assistant message:', assistantMessage.messageId);
+            console.log('📝 Found assistant message:', assistantMessage.id);
 
             // Get model from the message (provides audit trail)
             const model = message.model || assistantMessage.model;
             if (!model) {
-              console.error('❌ No model found in message:', message.messageId);
+              console.error('❌ No model found in message:', message.id);
               continue;
             }
 
@@ -382,7 +380,7 @@ export class ConvexClientAdapter {
               const chatSessionId = message.sessionId as ChatSessionId;
               this.messageCallback(
                 chatSessionId,
-                assistantMessage.messageId,
+                assistantMessage.id,
                 message.content,
                 model
               ).catch((error) => {
@@ -426,6 +424,25 @@ export class ConvexClientAdapter {
       chatSessionId,
       messageId,
       content,
+    });
+  }
+
+  /**
+   * Complete a message with structured content (separate reasoning and other parts).
+   */
+  async completeStructuredMessage(
+    chatSessionId: ChatSessionId,
+    messageId: string,
+    content: string,
+    reasoning?: string,
+    otherParts?: string
+  ): Promise<void> {
+    await this.httpClient.mutation(api.chat.completeStructuredMessage, {
+      chatSessionId,
+      messageId,
+      content,
+      reasoning,
+      otherParts,
     });
   }
 

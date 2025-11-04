@@ -186,6 +186,8 @@ export const sendMessage = mutation({
       sessionId: args.chatSessionId,
       role: 'assistant',
       content: '', // Will be filled as chunks arrive
+      reasoning: undefined, // Will be filled as chunks arrive
+      otherParts: undefined, // Will be filled as chunks arrive
       timestamp: timestamp + 1, // Slightly after user message
       completed: false,
       model: args.model,
@@ -302,6 +304,69 @@ export const completeMessage = mutation({
     await ctx.db.patch(session._id, {
       lastActivity: Date.now(),
     });
+  },
+});
+
+/**
+ * Complete a message with structured content.
+ * Called by worker service when streaming is done with separated content types.
+ *
+ * @param sessionId - Session this message belongs to
+ * @param messageId - Message to complete
+ * @param content - User-visible text content
+ * @param reasoning - Internal model thinking/reasoning
+ * @param otherParts - Other parts as JSON string (tool results, files, etc.)
+ */
+export const completeStructuredMessage = mutation({
+  args: {
+    chatSessionId: v.string(),
+    messageId: v.string(),
+    content: v.string(),
+    reasoning: v.optional(v.string()),
+    otherParts: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Verify session exists
+    const session = await ctx.db
+      .query('chatSessions')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
+      .first();
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Find message
+    const message = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_message_id', (q) => q.eq('messageId', args.messageId))
+      .first();
+
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    // Update message with structured content
+    await ctx.db.patch(message._id, {
+      content: args.content,
+      reasoning: args.reasoning,
+      otherParts: args.otherParts,
+      completed: true,
+    });
+
+    // Update session activity
+    await ctx.db.patch(session._id, {
+      lastActivity: Date.now(),
+    });
+
+    console.log(
+      `[completeStructuredMessage] Message ${args.messageId} completed with structured content:`,
+      {
+        contentLength: args.content.length,
+        reasoningLength: args.reasoning?.length || 0,
+        hasOtherParts: !!args.otherParts,
+      }
+    );
   },
 });
 
@@ -582,6 +647,8 @@ export const getMessages = query({
       sessionId: message.sessionId,
       role: message.role,
       content: message.content,
+      reasoning: message.reasoning,
+      otherParts: message.otherParts,
       timestamp: message.timestamp,
       completed: message.completed,
       model: message.model,
@@ -632,6 +699,8 @@ export const subscribeToMessages = query({
       sessionId: message.sessionId,
       role: message.role,
       content: message.content,
+      reasoning: message.reasoning,
+      otherParts: message.otherParts,
       timestamp: message.timestamp,
       completed: message.completed,
       model: message.model,
@@ -757,10 +826,12 @@ export const subscribeToWorkerMessages = query({
     const messages = allMessages.flat().sort((a, b) => a.timestamp - b.timestamp);
 
     return messages.map((message) => ({
-      messageId: message.messageId,
+      id: message.messageId,
       sessionId: message.sessionId,
       role: message.role,
       content: message.content,
+      reasoning: message.reasoning,
+      otherParts: message.otherParts,
       timestamp: message.timestamp,
       completed: message.completed,
       model: message.model,

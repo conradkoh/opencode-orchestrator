@@ -201,19 +201,47 @@ export class ChatSessionManager {
         model
       );
 
-      let fullResponse = '';
+      let fullContent = '';
+      let fullReasoning = '';
+      const otherParts: unknown[] = [];
       let sequence = 0;
 
       // Stream chunks as they arrive from opencode
-      for await (const chunk of responseIterator) {
-        fullResponse += chunk;
-        await this.convexClient.writeChunk(chatSessionId, messageId, chunk, sequence++);
-        console.log(`📤 Chunk ${sequence} sent (${chunk.length} chars)`);
+      for await (const response of responseIterator) {
+        if (response.content) {
+          fullContent += response.content;
+          await this.convexClient.writeChunk(
+            chatSessionId,
+            messageId,
+            response.content,
+            sequence++
+          );
+          console.log(`📤 Content chunk ${sequence} sent (${response.content.length} chars)`);
+        }
+
+        if (response.reasoning) {
+          fullReasoning += response.reasoning;
+          // Reasoning is not streamed to UI, just logged
+          console.log(`🧠 Reasoning chunk received (${response.reasoning.length} chars)`);
+        }
+
+        if (response.otherParts) {
+          otherParts.push(...response.otherParts);
+          console.log(`🔧 Other parts received: ${response.otherParts.length} parts`);
+        }
       }
 
-      // Complete the message with full content
-      await this.convexClient.completeMessage(chatSessionId, messageId, fullResponse);
-      console.log(`✅ Message ${messageId} completed (${fullResponse.length} chars total)`);
+      // Complete the message with structured content
+      await this.convexClient.completeStructuredMessage(
+        chatSessionId,
+        messageId,
+        fullContent || '',
+        fullReasoning || undefined,
+        otherParts.length > 0 ? JSON.stringify(otherParts) : undefined
+      );
+      console.log(
+        `✅ Message ${messageId} completed (content: ${fullContent.length} chars, reasoning: ${fullReasoning.length} chars, other: ${otherParts.length} parts)`
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(`❌ Failed to process message ${messageId}:`, errorMsg);

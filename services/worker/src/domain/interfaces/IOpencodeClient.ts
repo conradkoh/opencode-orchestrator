@@ -64,6 +64,19 @@ export interface OpencodePromptConfig {
 }
 
 /**
+ * Structured response from OpenCode prompt.
+ * Separates user-visible content from internal reasoning and other parts.
+ */
+export interface OpencodeStructuredResponse {
+  /** User-visible text content */
+  content?: string;
+  /** Internal model thinking/reasoning */
+  reasoning?: string;
+  /** Other parts (tool results, file references, patches, etc.) */
+  otherParts?: unknown[];
+}
+
+/**
  * Port interface for OpenCode SDK integration.
  * Abstracts OpenCode operations to maintain clean architecture.
  *
@@ -139,13 +152,13 @@ export interface IOpencodeClient {
 
   /**
    * Sends a prompt to a session and streams the response.
-   * Returns an async iterable iterator that yields response chunks.
+   * Returns an async iterable iterator that yields structured response chunks.
    *
    * @param client - OpenCode client instance
    * @param sessionId - Session identifier
    * @param content - Message content to send
    * @param model - Optional model override for this message
-   * @returns Async iterable iterator yielding response chunks
+   * @returns Async iterable iterator yielding structured response chunks
    * @throws Error if prompt fails
    *
    * @see https://opencode.ai/docs/sdk/#sessions
@@ -155,7 +168,7 @@ export interface IOpencodeClient {
     sessionId: SessionId,
     content: string,
     model?: string
-  ): AsyncIterableIterator<string>;
+  ): AsyncIterableIterator<OpencodeStructuredResponse>;
 
   /**
    * Closes a session and cleans up resources.

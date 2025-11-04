@@ -1,7 +1,14 @@
 'use client';
 
-import { InfoIcon, SparklesIcon, UserIcon } from 'lucide-react';
-import { useMemo } from 'react';
+import {
+  BrainIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  InfoIcon,
+  SparklesIcon,
+  UserIcon,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType } from '../types';
 
@@ -30,6 +37,7 @@ export interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = useMemo(() => message.role === 'user', [message.role]);
   const isSystem = useMemo(() => message.role === 'system', [message.role]);
+  const [showReasoning, setShowReasoning] = useState(false);
 
   /**
    * Formats the timestamp into a localized time string.
@@ -42,6 +50,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
       }),
     [message.timestamp]
   );
+
+  /**
+   * Check if message has reasoning content.
+   */
+  const hasReasoning = useMemo(() => {
+    return message.reasoning && message.reasoning.trim().length > 0;
+  }, [message.reasoning]);
 
   return (
     <div
@@ -89,6 +104,33 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {message.content}
           </p>
         </div>
+
+        {/* Reasoning section for assistant messages */}
+        {hasReasoning && !isUser && !isSystem && (
+          <div className="mt-3 border-t pt-3">
+            <button
+              type="button"
+              onClick={() => setShowReasoning(!showReasoning)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <BrainIcon className="h-4 w-4" />
+              <span>Model Reasoning</span>
+              {showReasoning ? (
+                <ChevronUpIcon className="h-4 w-4" />
+              ) : (
+                <ChevronDownIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {showReasoning && (
+              <div className="mt-2 p-3 bg-muted/50 rounded-md border">
+                <p className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed m-0">
+                  {message.reasoning}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

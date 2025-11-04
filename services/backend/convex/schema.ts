@@ -347,12 +347,19 @@ export default defineSchema({
    * Stores both user messages and assistant responses.
    * Messages can be incomplete while streaming (completed: false).
    * Each message stores the model that was used, providing an audit trail.
+   *
+   * Content Separation:
+   * - content: User-visible text content (what the user should see)
+   * - reasoning: Internal model thinking/reasoning traces
+   * - otherParts: Tool results, file references, patches, etc. (JSON string)
    */
   chatMessages: defineTable({
     messageId: v.string(), // Primary key (nanoid)
     sessionId: v.string(), // Session this message belongs to
     role: v.union(v.literal('user'), v.literal('assistant'), v.literal('system')),
-    content: v.string(), // Full message content
+    content: v.string(), // User-visible text content only
+    reasoning: v.optional(v.string()), // Internal model thinking/reasoning
+    otherParts: v.optional(v.string()), // Other parts as JSON string (tool results, files, etc.)
     timestamp: v.number(), // When message was created
     completed: v.boolean(), // False while streaming, true when done
     model: v.optional(v.string()), // AI model used for this message (e.g., "claude-sonnet-4-5")

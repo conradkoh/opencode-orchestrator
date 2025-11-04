@@ -4,6 +4,7 @@ import type {
   IOpencodeClient,
   IOpencodeInstance,
   OpencodeSessionInfo,
+  OpencodeStructuredResponse,
 } from '@domain/interfaces/IOpencodeClient';
 import type { SessionId } from '@domain/valueObjects/Ids';
 import type { OpencodeClient } from '@opencode-ai/sdk';
@@ -293,7 +294,7 @@ export class OpencodeClientAdapter implements IOpencodeClient {
 
   /**
    * Sends a prompt to a session and streams the response.
-   * Returns an async iterable iterator that yields response chunks.
+   * Returns an async iterable iterator that yields structured response chunks.
    *
    * NOTE: The current SDK implementation returns complete messages, not true streaming.
    * For real-time streaming, we would need to use the Events API (event.subscribe).
@@ -305,7 +306,7 @@ export class OpencodeClientAdapter implements IOpencodeClient {
    * @param sessionId - Session identifier
    * @param content - Message content to send
    * @param model - Optional model override for this message
-   * @returns Async iterable iterator yielding response chunks
+   * @returns Async iterable iterator yielding structured response chunks
    * @throws Error if prompt fails
    */
   async *sendPrompt(
@@ -313,7 +314,7 @@ export class OpencodeClientAdapter implements IOpencodeClient {
     sessionId: SessionId,
     content: string,
     model?: string
-  ): AsyncIterableIterator<string> {
+  ): AsyncIterableIterator<OpencodeStructuredResponse> {
     try {
       const instance = client as OpencodeInstanceInternal;
       const sdkClient = instance._internal.client;
@@ -344,14 +345,30 @@ export class OpencodeClientAdapter implements IOpencodeClient {
       });
 
       // The SDK returns a complete message with parts
-      // We yield each part's text content
+      // We separate different part types
       if (result.data && 'parts' in result.data) {
         const parts = result.data.parts;
+        const contentParts: string[] = [];
+        const reasoningParts: string[] = [];
+        const otherParts: unknown[] = [];
+
         for (const part of parts) {
-          if ('text' in part && part.text) {
-            yield part.text;
+          if (part.type === 'text' && part.text) {
+            contentParts.push(part.text);
+          } else if (part.type === 'reasoning' && part.text) {
+            reasoningParts.push(part.text);
+          } else {
+            // Store other parts (tool results, files, patches, etc.)
+            otherParts.push(part);
           }
         }
+
+        // Yield structured data
+        yield {
+          content: contentParts.length > 0 ? contentParts.join('\n') : undefined,
+          reasoning: reasoningParts.length > 0 ? reasoningParts.join('\n') : undefined,
+          otherParts: otherParts.length > 0 ? otherParts : undefined,
+        };
       }
     } catch (error) {
       throw new Error(

@@ -112,14 +112,18 @@ export interface AssistantsData {
  * Represents a single message in a chat session.
  */
 export interface ChatMessage {
-  /** Unique identifier for the message */
+  /** Unique identifier for message */
   id: string;
   /** Session this message belongs to */
   sessionId: string;
   /** Role of the message sender */
   role: 'user' | 'assistant' | 'system';
-  /** Message content/text */
+  /** User-visible text content */
   content: string;
+  /** Internal model thinking/reasoning */
+  reasoning?: string;
+  /** Other parts as JSON string (tool results, files, patches, etc.) */
+  otherParts?: string;
   /** Timestamp when the message was created */
   timestamp: number;
   /** Whether the message is complete (false while streaming) */
