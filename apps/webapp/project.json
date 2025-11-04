@@ -41,6 +41,22 @@
         "cwd": "apps/webapp"
       },
       "dependsOn": ["^build"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm test",
+        "cwd": "apps/webapp"
+      },
+      "outputs": ["{projectRoot}/coverage"]
+    },
+    "test:watch": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm test:watch",
+        "cwd": "apps/webapp"
+      },
+      "continuous": true
     }
   },
   "tags": []

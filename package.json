@@ -4,8 +4,8 @@
   "description": "AI assistant orchestration platform with OpenCode integration",
   "main": "index.js",
   "scripts": {
-    "test": "nx run-many --target=test --projects=@workspace/backend,@workspace/worker",
-    "test:watch": "nx run-many --target=test:watch --projects=@workspace/backend,@workspace/worker",
+    "test": "nx run-many --target=test --projects=@workspace/webapp,@workspace/backend,@workspace/worker",
+    "test:watch": "nx run-many --target=test:watch --projects=@workspace/webapp,@workspace/backend,@workspace/worker",
     "dev": "nx run @workspace/webapp:dev",
     "setup": "node scripts/setup.js",
     "lint": "biome check .",

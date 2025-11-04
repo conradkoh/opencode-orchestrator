@@ -38,6 +38,11 @@
       "outputs": ["{projectRoot}/coverage"],
       "cache": true
     },
+    "test:watch": {
+      "inputs": ["default", "^production"],
+      "cache": false,
+      "continuous": true
+    },
     "lint": {
       "inputs": ["default"],
       "cache": true
