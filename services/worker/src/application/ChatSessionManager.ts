@@ -92,23 +92,43 @@ export class ChatSessionManager {
   /**
    * Start a new chat session (without creating OpenCode session yet).
    * OpenCode session will be created lazily when first message arrives with a model.
+   * If session was previously active and has an opencodeSessionId, it will be restored.
    * @param chatSessionId - Convex chat session ID (ChatSessionId branded type)
    */
   async startSession(chatSessionId: ChatSessionId): Promise<void> {
-    console.log(
-      `🚀 Registering session ${chatSessionId} (OpenCode session will be created on first message)`
-    );
+    console.log(`🚀 Registering session ${chatSessionId} (checking for existing OpenCode session)`);
 
     try {
-      // Store session info - OpenCode session will be created when first message arrives
-      this.activeSessions.set(chatSessionId, {
-        chatSessionId,
-        model: '', // Will be set from first message
-        startedAt: Date.now(),
-        isInitializing: false, // Not initializing yet - will initialize on first message
-      });
+      // Check if this session already exists in Convex with an opencodeSessionId
+      const activeSessions = await this.convexClient.getActiveSessions();
+      const existingSession = activeSessions.find((s) => s.chatSessionId === chatSessionId);
 
-      console.log(`✅ Session ${chatSessionId} registered`);
+      if (existingSession?.opencodeSessionId) {
+        // Session resume: restore existing OpenCode session
+        console.log(
+          `♻️  Restoring existing OpenCode session ${existingSession.opencodeSessionId} for ${chatSessionId}`
+        );
+        this.activeSessions.set(chatSessionId, {
+          chatSessionId,
+          opencodeSessionId: existingSession.opencodeSessionId,
+          model: existingSession.model || '', // Restore model if available
+          startedAt: Date.now(),
+          isInitializing: false,
+        });
+        console.log(`✅ Session ${chatSessionId} restored with context`);
+      } else {
+        // New session: OpenCode session will be created when first message arrives
+        console.log(
+          `🆕 New session ${chatSessionId} - OpenCode session will be created on first message)`
+        );
+        this.activeSessions.set(chatSessionId, {
+          chatSessionId,
+          model: '', // Will be set from first message
+          startedAt: Date.now(),
+          isInitializing: false, // Not initializing yet - will initialize on first message
+        });
+        console.log(`✅ Session ${chatSessionId} registered`);
+      }
     } catch (error) {
       console.error(`❌ Failed to register session ${chatSessionId}:`, error);
       this.activeSessions.delete(chatSessionId);
