@@ -12,6 +12,16 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAppUrlState } from '../hooks/useAppUrlState';
@@ -58,6 +68,10 @@ export function ChatInterface() {
   // Local UI state (not persisted to URL)
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  const [showResumeConfirmDialog, setShowResumeConfirmDialog] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<{ content: string; model: string } | null>(
+    null
+  );
 
   // Single ref for chat input - React will attach it to whichever instance is currently mounted
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -191,12 +205,20 @@ export function ChatInterface() {
   /**
    * Handles sending a message to the active session.
    * Auto-creates a session if none exists.
+   * Shows confirmation dialog if session is inactive.
    * Passes the currently selected model with each message.
    */
   const handleSendMessage = useCallback(
     async (content: string) => {
       if (!selectedModel) {
         console.error('[ChatInterface] No model selected');
+        return;
+      }
+
+      // If session is inactive, show confirmation dialog first
+      if (session?.status === 'inactive') {
+        setPendingMessage({ content, model: selectedModel });
+        setShowResumeConfirmDialog(true);
         return;
       }
 
@@ -288,6 +310,39 @@ export function ChatInterface() {
       setIsEndingSession(false);
     }
   }, [session, endSession, urlActions]);
+
+  /**
+   * Handles confirming the resume action and sending the pending message.
+   */
+  const handleConfirmResume = useCallback(async () => {
+    if (!pendingMessage || !session) return;
+
+    try {
+      // Send the pending message - backend will auto-resume the session
+      await sendMessageMutation({
+        chatSessionId: session.sessionId,
+        content: pendingMessage.content,
+        model: pendingMessage.model,
+      });
+
+      // Clear pending message and close dialog
+      setPendingMessage(null);
+      setShowResumeConfirmDialog(false);
+
+      // Trigger focus after state updates
+      setShouldFocusInput(true);
+    } catch (error) {
+      console.error('[ChatInterface] Failed to send message after resume:', error);
+    }
+  }, [pendingMessage, session, sendMessageMutation]);
+
+  /**
+   * Handles canceling the resume action.
+   */
+  const handleCancelResume = useCallback(() => {
+    setPendingMessage(null);
+    setShowResumeConfirmDialog(false);
+  }, []);
 
   /**
    * Handles model selection change.
@@ -562,6 +617,23 @@ export function ChatInterface() {
           <p className="text-sm text-muted-foreground">Select an assistant to view sessions</p>
         </div>
       )}
+
+      {/* Resume Session Confirmation Dialog */}
+      <AlertDialog open={showResumeConfirmDialog} onOpenChange={setShowResumeConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resume Closed Session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This session is currently closed. Sending a message will reactivate it and close any
+              other active sessions for this worker. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelResume}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmResume}>Send Message</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
