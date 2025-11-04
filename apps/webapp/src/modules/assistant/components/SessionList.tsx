@@ -69,14 +69,11 @@ export function SessionList({
 }: SessionListProps) {
   /**
    * Handles session item click to restore a session.
-   * Prevents restoring inactive sessions.
+   * Allows viewing inactive sessions in read-only mode.
    */
   const handleSessionClick = useCallback(
-    (sessionId: string, sessionStatus: string) => {
-      // Don't restore inactive sessions
-      if (sessionStatus === 'inactive') {
-        return;
-      }
+    (sessionId: string) => {
+      // Allow viewing all sessions (inactive sessions are shown in read-only mode)
       onRestoreSession(sessionId);
     },
     [onRestoreSession]
@@ -116,7 +113,7 @@ export function SessionList({
               <button
                 key={session.sessionId}
                 type="button"
-                onClick={() => handleSessionClick(session.sessionId, session.status)}
+                onClick={() => handleSessionClick(session.sessionId)}
                 disabled={isLoading}
                 className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -148,9 +145,10 @@ export function SessionList({
                 <button
                   key={session.sessionId}
                   type="button"
-                  onClick={() => handleSessionClick(session.sessionId, session.status)}
-                  disabled={true}
-                  className="w-full text-left p-3 rounded-lg border border-border opacity-60 cursor-not-allowed"
+                  onClick={() => handleSessionClick(session.sessionId)}
+                  disabled={isLoading}
+                  title="View session history (read-only)"
+                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent/30 transition-colors opacity-75 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">

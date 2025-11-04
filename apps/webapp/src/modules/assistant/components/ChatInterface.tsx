@@ -94,17 +94,6 @@ export function ChatInterface() {
     });
   }, [selectedMachineId, selectedWorkerId, urlChatSessionId, session, messages.length]);
 
-  // Auto-close session when it becomes inactive (e.g. worker went offline or user closed it)
-  useEffect(() => {
-    if (session?.status === 'inactive' && urlChatSessionId) {
-      console.log('[ChatInterface] Session inactive, clearing from URL');
-      // Clear inactive session from URL after a brief delay to show the state
-      setTimeout(() => {
-        urlActions.setChatSessionId(null);
-      }, 1000);
-    }
-  }, [session?.status, urlChatSessionId, urlActions]);
-
   // Request worker connection when worker is selected
   // This is a side effect (network request), not state synchronization
   // biome-ignore lint/correctness/useExhaustiveDependencies: connectWorker reference changes on every render, but we only want to trigger when workerId changes
@@ -133,24 +122,17 @@ export function ChatInterface() {
   // Restore session from URL on mount or when URL session changes
   // This is a side effect (restore session), not state synchronization
   // Skip restoring if we're currently ending a session (urlChatSessionId is null but session still exists briefly)
+  // NOTE: This now supports restoring inactive sessions for read-only viewing
   useEffect(() => {
     if (urlChatSessionId && selectedWorkerId && !session) {
       console.log('[ChatInterface] Restoring session from URL:', urlChatSessionId);
-      // Check if this session is inactive before restoring
-      const urlSession = sessions?.find((s) => s.sessionId === urlChatSessionId);
-      if (urlSession?.status === 'inactive') {
-        console.log('[ChatInterface] Skipping restore - session is inactive');
-        // Clear inactive session from URL
-        urlActions.setChatSessionId(null);
-        return;
-      }
       restoreSession(urlChatSessionId).catch((error) => {
         console.error('[ChatInterface] Failed to restore session from URL:', error);
         // Clear invalid session from URL
         urlActions.setChatSessionId(null);
       });
     }
-  }, [urlChatSessionId, selectedWorkerId, session, sessions, restoreSession, urlActions]);
+  }, [urlChatSessionId, selectedWorkerId, session, restoreSession, urlActions]);
 
   // Initialize model from session when restoring, or auto-select first model when worker is selected
   // Only runs when session/worker/models change, NOT when user changes selectedModel
