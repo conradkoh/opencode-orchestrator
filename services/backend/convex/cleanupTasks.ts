@@ -13,17 +13,11 @@ export interface LoginRequestsCleanupResult extends CleanupResult {
   deletedConnectCount: number;
 }
 
-export interface StaleWorkersCleanupResult extends CleanupResult {
-  markedOfflineCount: number;
-  affectedMachineIds: string[];
-}
-
 export interface AllCleanupResults {
   success: boolean;
   results: {
     loginRequests: LoginRequestsCleanupResult;
     loginCodes: CleanupResult;
-    staleWorkers: StaleWorkersCleanupResult;
   };
 }
 
@@ -134,63 +128,6 @@ export const cleanupExpiredLoginCodes = internalMutation({
 });
 
 /**
- * Detect workers with stale heartbeats and mark them offline.
- * A worker is considered stale if its lastHeartbeat is older than 90 seconds.
- * This is 3x the heartbeat interval (30s) to allow for network delays.
- */
-export const detectStaleWorkers = internalMutation({
-  args: {},
-  handler: async (ctx, _args): Promise<StaleWorkersCleanupResult> => {
-    const now = Date.now();
-    const STALE_THRESHOLD_MS = 90_000; // 90 seconds
-    const staleTimestamp = now - STALE_THRESHOLD_MS;
-
-    // Find workers marked as online with stale heartbeats
-    const staleWorkers = await ctx.db
-      .query('workers')
-      .filter((q) =>
-        q.and(
-          q.eq(q.field('status'), 'online'),
-          q.or(
-            // lastHeartbeat is too old
-            q.lt(q.field('lastHeartbeat'), staleTimestamp),
-            // lastHeartbeat doesn't exist (shouldn't happen but handle it)
-            q.eq(q.field('lastHeartbeat'), undefined)
-          )
-        )
-      )
-      .collect();
-
-    const affectedMachineIds = new Set<string>();
-    let markedOfflineCount = 0;
-
-    // Mark stale workers as offline
-    for (const worker of staleWorkers) {
-      await ctx.db.patch(worker._id, {
-        status: 'offline',
-        lastHeartbeat: now, // Update timestamp to prevent repeated processing
-      });
-      affectedMachineIds.add(worker.machineId);
-      markedOfflineCount++;
-    }
-
-    // Update machine statuses for all affected machines
-    for (const machineId of affectedMachineIds) {
-      await ctx.scheduler.runAfter(0, internal.machines.updateMachineStatus, {
-        machineId,
-      });
-    }
-
-    return {
-      success: true,
-      deletedCount: 0, // Not deleting, just updating status
-      markedOfflineCount,
-      affectedMachineIds: Array.from(affectedMachineIds),
-    };
-  },
-});
-
-/**
  * Master cleanup function that runs all cleanup tasks.
  */
 export const runAllCleanupTasks = internalMutation({
@@ -199,7 +136,6 @@ export const runAllCleanupTasks = internalMutation({
     const results = {
       loginRequests: await ctx.runMutation(internal.cleanupTasks.cleanupExpiredLoginRequests, {}),
       loginCodes: await ctx.runMutation(internal.cleanupTasks.cleanupExpiredLoginCodes, {}),
-      staleWorkers: await ctx.runMutation(internal.cleanupTasks.detectStaleWorkers, {}),
     };
 
     return {
@@ -221,13 +157,6 @@ const _registerCleanupCronJobs = (): typeof cleanupCronJobs => {
     'cleanup expired auth data',
     { minutes: 10 },
     internal.cleanupTasks.runAllCleanupTasks
-  );
-
-  // Run stale worker detection every 2 minutes for faster offline detection
-  cleanupCronJobs.interval(
-    'detect stale workers',
-    { minutes: 2 },
-    internal.cleanupTasks.detectStaleWorkers
   );
 
   return cleanupCronJobs;
