@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { MachineConfig } from '../../../domain/entities/Machine';
-import { Machine } from '../../../domain/entities/Machine';
-import { Session } from '../../../domain/entities/Session';
-import { Worker } from '../../../domain/entities/Worker';
+import type { MachineConfig } from './Machine';
+import { Machine } from './Machine';
+import { Session } from './Session';
+import { Worker } from './Worker';
 
 describe('Machine Entity', () => {
   describe('create', () => {

@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  WorkerEvent,
-  WorkerState,
-  WorkerStateMachine,
-} from '../../../domain/entities/WorkerStateMachine';
+import { WorkerEvent, WorkerState, WorkerStateMachine } from './WorkerStateMachine';
 
 describe('WorkerStateMachine', () => {
   let fsm: WorkerStateMachine;

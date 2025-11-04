@@ -5,7 +5,7 @@ import {
   calculateSyncPlan,
   type OpencodeSession,
   validateIdempotency,
-} from '../OpencodeConvexSync';
+} from './OpencodeConvexSync';
 
 describe('OpencodeConvexSync', () => {
   describe('calculateSyncPlan', () => {

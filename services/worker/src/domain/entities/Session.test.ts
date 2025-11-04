@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionConfig } from '../../../domain/entities/Session';
-import { Session } from '../../../domain/entities/Session';
+import type { SessionConfig } from './Session';
+import { Session } from './Session';
 
 describe('Session Entity', () => {
   beforeEach(() => {

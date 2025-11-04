@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Session } from '../../../domain/entities/Session';
-import type { WorkerEntityConfig } from '../../../domain/entities/Worker';
-import { Worker } from '../../../domain/entities/Worker';
+import { Session } from './Session';
+import type { WorkerEntityConfig } from './Worker';
+import { Worker } from './Worker';
 
 describe('Worker Entity', () => {
   describe('create', () => {
