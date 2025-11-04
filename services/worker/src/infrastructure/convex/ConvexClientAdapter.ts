@@ -10,8 +10,9 @@ export type ConnectCallback = () => Promise<void>;
 
 /**
  * Callback for new chat sessions.
+ * Model is no longer passed - it will be specified with the first message.
  */
-export type SessionStartCallback = (chatSessionId: ChatSessionId, model: string) => Promise<void>;
+export type SessionStartCallback = (chatSessionId: ChatSessionId) => Promise<void>;
 
 /**
  * Callback for new messages.
@@ -19,7 +20,8 @@ export type SessionStartCallback = (chatSessionId: ChatSessionId, model: string)
 export type MessageCallback = (
   chatSessionId: ChatSessionId,
   messageId: string,
-  content: string
+  content: string,
+  model: string
 ) => Promise<void>;
 
 /**
@@ -274,7 +276,7 @@ export class ConvexClientAdapter {
             if (this.sessionStartCallback) {
               // Cast to branded type
               const chatSessionId = session.sessionId as ChatSessionId;
-              this.sessionStartCallback(chatSessionId, session.model).catch((error) => {
+              this.sessionStartCallback(chatSessionId).catch((error) => {
                 console.error('❌ Error in session start callback:', error);
               });
             }
@@ -365,6 +367,15 @@ export class ConvexClientAdapter {
 
             console.log('📝 Found assistant message:', assistantMessage.messageId);
 
+            // Get model from the message (provides audit trail)
+            const model = message.model || assistantMessage.model;
+            if (!model) {
+              console.error('❌ No model found in message:', message.messageId);
+              continue;
+            }
+
+            console.log('🤖 Message model:', model);
+
             // Notify callback with assistant message ID (where response should be written)
             if (this.messageCallback) {
               // Cast to branded type
@@ -372,7 +383,8 @@ export class ConvexClientAdapter {
               this.messageCallback(
                 chatSessionId,
                 assistantMessage.messageId,
-                message.content
+                message.content,
+                model
               ).catch((error) => {
                 console.error('❌ Error in message callback:', error);
               });
@@ -438,7 +450,7 @@ export class ConvexClientAdapter {
       chatSessionId: ChatSessionId;
       opencodeSessionId?: OpencodeSessionId;
       workerId: string;
-      model: string;
+      model?: string; // Optional - deprecated field
       status: string;
       createdAt: number;
       lastActivity: number;

@@ -2,11 +2,11 @@
 
 ## Title
 
-Dynamic Model Selection During Active Chat Sessions
+Dynamic Model Selection with Per-Message Model Tracking
 
 ## Description
 
-Allows users to switch AI models mid-conversation without ending their current chat session. The model change persists in the session record and the worker seamlessly transitions to using the new model for subsequent messages while preserving the existing conversation context.
+Allows users to switch AI models mid-conversation without ending their current chat session. Each message stores the model that was requested by the user, providing a complete audit trail of which model was used for each interaction. This enables model switching at any time while maintaining full history of model choices.
 
 ## Sequence Diagram
 
@@ -15,27 +15,26 @@ Allows users to switch AI models mid-conversation without ending their current c
 actor User
 participant "ChatInterface" as UI
 participant "useAssistantChat" as Hook
-participant "updateSessionModel" as Mutation
+participant "sendMessage" as Mutation
 database "Convex DB" as DB
 participant "Worker" as Worker
 
 User -> UI : Changes model in selector
-UI -> Hook : updateModel(newModel: string): Promise<void>
-Hook -> Mutation : updateSessionModel({ chatSessionId, model }): Promise<void>
-Mutation -> DB : Find session by sessionId
-Mutation -> DB : Verify user ownership
-Mutation -> DB : Update session.model = newModel
-Mutation -> DB : Update lastActivity timestamp
-Mutation --> Hook : Success
-Hook --> UI : Model updated
-UI -> UI : Display updated model in selector
+UI -> UI : Update local selectedModel state
 
-User -> UI : Sends new message
-UI -> Hook : sendMessage(content: string): Promise<void>
-Hook -> DB : Create user message
-Hook -> DB : Create placeholder assistant message
-Hook -> Worker : Process with new model
-Worker -> DB : Stream response chunks
+User -> UI : Sends new message with selected model
+UI -> Hook : sendMessage(content: string, model: string): Promise<void>
+Hook -> Mutation : sendMessage({ chatSessionId, content, model }): Promise<string>
+Mutation -> DB : Create user message with model field
+Mutation -> DB : Create placeholder assistant message with model field
+Mutation --> Hook : Return assistantMessageId
+Hook --> UI : Message sent
+
+Worker -> DB : Subscribe to new messages
+DB --> Worker : New user message detected (with model)
+Worker -> Worker : Read model from user message
+Worker -> Worker : Process with specified model
+Worker -> DB : Stream response chunks to assistant message
 DB --> UI : Real-time message updates
 
 @enduml
@@ -182,66 +181,69 @@ chatSessions: defineTable({
   .index('by_deleted', ['deletedInOpencode'])
 ```
 
-## Worker Behavior
-
-The worker service automatically uses the `session.model` field when processing messages:
-
-- `services/worker/src/application/ChatSessionManager.ts` - Already handles model from session
-  - No changes needed - worker reads model from session when processing messages
-  - OpenCode SDK supports model switching between messages in the same session
-
 ## Implementation Status
 
-✅ **COMPLETED** - All changes implemented and tested
+✅ **COMPLETED** - Per-message model tracking implemented
 
-### Frontend Changes (Completed)
+### Schema Changes (Completed)
 
-1. **ChatInputWithModel.tsx**: ✅
-   - Removed the `hasActiveSession ||` condition from the ModelSelector's disabled prop
-   - Model selector now remains enabled during active sessions
-
-2. **useAssistantChat.ts**: ✅
-   - Added `updateModelMutation` using `useSessionMutation(api.chat.updateSessionModel)`
-   - Added `updateModel` function that calls the mutation with error handling
-   - Exported `updateModel` in the return object
-
-3. **types.ts**: ✅
-   - Updated `AssistantChatReturn` interface to include `updateModel` method
-
-4. **ChatInterface.tsx**: ✅
-   - Updated `handleModelChange` to call `updateModel(model)` if there's an active session
-   - Added error handling with automatic revert to previous model on failure
-   - Added `useEffect` to sync selected model with session's model when restored
-   - Keeps existing behavior for setting local state when no session exists
+1. **schema.ts**: ✅
+   - Added optional `model` field to `chatMessages` table
+   - Provides complete audit trail of which model was requested for each message
 
 ### Backend Changes (Completed)
 
 1. **chat.ts**: ✅
-   - Added `updateSessionModel` mutation with:
-     - User authentication check using `SessionIdArg`
-     - Session existence check via database query
-     - User ownership verification
-     - Session active status check (prevents updating inactive sessions)
-     - Model field update in database
-     - lastActivity timestamp update
-     - Comprehensive console logging for debugging
+   - Updated `sendMessage` mutation to accept `model` parameter
+   - Stores model in both user and assistant messages
+   - Updates session.model for display purposes (last used model)
+   - Removed `updateSessionModel` mutation (no longer needed)
+   - Updated all message queries to return the `model` field
+
+### Frontend Changes (Completed)
+
+1. **ChatInputWithModel.tsx**: ✅
+   - Model selector remains enabled during active sessions (no `hasActiveSession` check)
+   - Users can change model at any time
+
+2. **useAssistantChat.ts**: ✅
+   - Updated `sendMessage` to accept `model` parameter
+   - Removed `updateModel` function (no longer needed)
+   - Messages now include `model` field in returned data
+
+3. **types.ts**: ✅
+   - Updated `ChatMessage` interface to include optional `model` field
+   - Updated `AssistantChatReturn.sendMessage` signature to accept model parameter
+   - Removed `updateModel` from interface
+
+4. **ChatInterface.tsx**: ✅
+   - Simplified `handleModelChange` to just update local state
+   - Updated `handleSendMessage` to pass selected model with each message
+   - Model changes take effect immediately on next message
 
 ### Worker Changes (Completed)
 
-1. **ChatSessionManager.ts**: ✅
-   - Updated `processMessage` to fetch latest session data from Convex before processing
-   - Dynamically uses the current model from database instead of cached value
-   - Updates local session cache when model changes
-   - Logs model changes for visibility
-   - Maintains backward compatibility with existing sessions
+1. **ConvexClientAdapter.ts**: ✅
+   - Updated `MessageCallback` type to include `model` parameter
+   - Extracts model from user message and passes it to callback
+   - Logs model for each message being processed
 
-### UX Features
+2. **ChatSessionManager.ts**: ✅
+   - Updated `processMessage` to accept `model` parameter
+   - Uses model from message (not from session cache)
+   - Updates local session model tracking for consistency
+   - Removed Convex query for session model (no longer needed)
 
-- ✅ Model selector remains enabled during active sessions
-- ✅ No interruption to ongoing conversations
-- ✅ Next message automatically uses the new model
-- ✅ Session record maintains accurate model state
-- ✅ Error handling with automatic rollback on failure
-- ✅ Console logging for debugging and transparency
-- ✅ Model sync when restoring sessions
+3. **WorkerLifecycleManager.ts**: ✅
+   - Updated message callback to pass model parameter to ChatSessionManager
+
+### Key Benefits
+
+- ✅ **Complete Audit Trail**: Every message stores which model was used
+- ✅ **Seamless Switching**: Change models at any time without ending session
+- ✅ **Historical Accuracy**: Can review which model generated each response
+- ✅ **No Session Updates**: Model changes don't require database mutations
+- ✅ **Simplified Architecture**: Model is part of message data, not session state
+- ✅ **Real-time Flexibility**: Each message can use a different model
+- ✅ **Performance**: No extra database queries needed to get current model
 

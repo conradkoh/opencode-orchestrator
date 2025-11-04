@@ -124,6 +124,8 @@ export interface ChatMessage {
   timestamp: number;
   /** Whether the message is complete (false while streaming) */
   completed: boolean;
+  /** AI model used for this message (provides audit trail) */
+  model?: string;
   /** Whether the message is currently being streamed (frontend-only flag) */
   isStreaming?: boolean;
 }
@@ -137,8 +139,8 @@ export interface ChatSession {
   sessionId: string;
   /** ID of the worker handling this session */
   workerId: string;
-  /** AI model being used for this session */
-  model: string;
+  /** AI model (deprecated - model is now stored per-message) */
+  model?: string;
   /** Current status of the session */
   status: 'active' | 'inactive';
   /** Timestamp when the session was created */
@@ -174,11 +176,11 @@ export interface AssistantChatReturn {
   /** Currently active session, or null if no session */
   session: ChatSession | null;
   /**
-   * Starts a new chat session with the specified model.
-   * @param model - AI model identifier to use for the session
+   * Starts a new chat session.
+   * Model is specified with each message, not at session creation.
    * @returns Promise resolving to the new session ID
    */
-  startSession: (model: string) => Promise<string>;
+  startSession: () => Promise<string>;
   /**
    * Restores an existing session by its ID.
    * @param sessionId - ID of the session to restore
@@ -200,18 +202,13 @@ export interface AssistantChatReturn {
   /** Array of messages in the current session */
   messages: ChatMessage[];
   /**
-   * Sends a message to the active session.
+   * Sends a message to the active session with the specified model.
+   * Each message stores the model for audit trail purposes.
    * @param content - Message text to send
+   * @param model - AI model to use for this message
    * @returns Promise that resolves when message is sent
    */
-  sendMessage: (content: string) => Promise<void>;
-  /**
-   * Updates the AI model for the current active session.
-   * Allows switching models mid-conversation.
-   * @param model - New AI model identifier to use
-   * @returns Promise that resolves when model is updated
-   */
-  updateModel: (model: string) => Promise<void>;
+  sendMessage: (content: string, model: string) => Promise<void>;
 
   // State
   /** Whether any operation is in progress */

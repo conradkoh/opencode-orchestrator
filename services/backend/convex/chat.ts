@@ -8,19 +8,18 @@ import type { ChatSessionId, OpencodeSessionId } from './types/sessionIds';
 /**
  * Start a new chat session with a worker.
  * Creates a session record and notifies the worker to initialize.
+ * Model is no longer required - it will be specified with each message.
  *
  * @param workerId - Worker to handle this session
- * @param model - AI model to use (e.g., "claude-sonnet-4-5")
  * @returns chatSessionId for the new session (ChatSessionId branded type)
  */
 export const startSession = mutation({
   args: {
     ...SessionIdArg,
     workerId: v.string(),
-    model: v.string(),
   },
   handler: async (ctx, args): Promise<ChatSessionId> => {
-    console.log('[startSession] Called with:', { workerId: args.workerId, model: args.model });
+    console.log('[startSession] Called with:', { workerId: args.workerId });
 
     // Verify user is authenticated
     const user = await getAuthUserOptional(ctx, args);
@@ -60,11 +59,11 @@ export const startSession = mutation({
     console.log('[startSession] Generated chatSessionId:', chatSessionId);
 
     // Create session record (opencodeSessionId will be set later by worker)
+    // Model is not stored at session level - it's tracked per-message
     await ctx.db.insert('chatSessions', {
       sessionId: chatSessionId,
       workerId: args.workerId,
       userId: user._id,
-      model: args.model,
       status: 'active',
       createdAt: Date.now(),
       lastActivity: Date.now(),
@@ -119,9 +118,11 @@ export const endSession = mutation({
 /**
  * Send a message in a chat session.
  * Creates user message and placeholder assistant message for streaming.
+ * Each message stores the model that should be used for processing.
  *
  * @param sessionId - Session to send message in
  * @param content - Message content
+ * @param model - AI model to use for this message
  * @returns messageId for the assistant response
  */
 export const sendMessage = mutation({
@@ -129,8 +130,15 @@ export const sendMessage = mutation({
     ...SessionIdArg,
     chatSessionId: v.string(),
     content: v.string(),
+    model: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log('[sendMessage] Called with:', {
+      chatSessionId: args.chatSessionId,
+      model: args.model,
+      contentLength: args.content.length,
+    });
+
     // Verify user is authenticated
     const user = await getAuthUserOptional(ctx, args);
     if (!user) {
@@ -159,7 +167,7 @@ export const sendMessage = mutation({
 
     const timestamp = Date.now();
 
-    // Create user message
+    // Create user message with model
     const userMessageId = nanoid();
     await ctx.db.insert('chatMessages', {
       messageId: userMessageId,
@@ -168,9 +176,10 @@ export const sendMessage = mutation({
       content: args.content,
       timestamp,
       completed: true,
+      model: args.model,
     });
 
-    // Create placeholder assistant message for streaming
+    // Create placeholder assistant message for streaming with same model
     const assistantMessageId = nanoid();
     await ctx.db.insert('chatMessages', {
       messageId: assistantMessageId,
@@ -179,13 +188,16 @@ export const sendMessage = mutation({
       content: '', // Will be filled as chunks arrive
       timestamp: timestamp + 1, // Slightly after user message
       completed: false,
+      model: args.model,
     });
 
-    // Update session activity
+    // Update session activity and model (for display purposes)
     await ctx.db.patch(session._id, {
       lastActivity: timestamp,
+      model: args.model,
     });
 
+    console.log('[sendMessage] Messages created with model:', args.model);
     return assistantMessageId;
   },
 });
@@ -572,6 +584,7 @@ export const getMessages = query({
       content: message.content,
       timestamp: message.timestamp,
       completed: message.completed,
+      model: message.model,
     }));
   },
 });
@@ -621,6 +634,7 @@ export const subscribeToMessages = query({
       content: message.content,
       timestamp: message.timestamp,
       completed: message.completed,
+      model: message.model,
     }));
   },
 });
@@ -749,62 +763,8 @@ export const subscribeToWorkerMessages = query({
       content: message.content,
       timestamp: message.timestamp,
       completed: message.completed,
+      model: message.model,
     }));
-  },
-});
-
-/**
- * Update the AI model for an active chat session.
- * Allows users to switch models mid-conversation.
- *
- * @param chatSessionId - Session to update
- * @param model - New AI model to use (e.g., "claude-sonnet-4-5", "gpt-4")
- */
-export const updateSessionModel = mutation({
-  args: {
-    ...SessionIdArg,
-    chatSessionId: v.string(),
-    model: v.string(),
-  },
-  handler: async (ctx, args): Promise<void> => {
-    console.log('[updateSessionModel] Called with:', {
-      chatSessionId: args.chatSessionId,
-      model: args.model,
-    });
-
-    // Verify user is authenticated
-    const user = await getAuthUserOptional(ctx, args);
-    if (!user) {
-      throw new Error('Unauthorized: Must be logged in to update a session');
-    }
-
-    // Find session
-    const session = await ctx.db
-      .query('chatSessions')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.chatSessionId))
-      .first();
-
-    if (!session) {
-      throw new Error('Session not found');
-    }
-
-    // Verify user owns the session
-    if (session.userId !== user._id) {
-      throw new Error('Unauthorized: You do not own this session');
-    }
-
-    // Verify session is active
-    if (session.status !== 'active') {
-      throw new Error('Cannot update model on inactive session');
-    }
-
-    // Update session model
-    await ctx.db.patch(session._id, {
-      model: args.model,
-      lastActivity: Date.now(),
-    });
-
-    console.log('[updateSessionModel] Model updated successfully');
   },
 });
 

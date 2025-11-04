@@ -31,7 +31,6 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   const startSessionMutation = useSessionMutation(api.chat.startSession);
   const endSessionMutation = useSessionMutation(api.chat.endSession);
   const sendMessageMutation = useSessionMutation(api.chat.sendMessage);
-  const updateSessionModelMutation = useSessionMutation(api.chat.updateSessionModel);
 
   // Queries
   const sessionData = useSessionQuery(
@@ -82,6 +81,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
         content: string;
         timestamp: number;
         completed: boolean;
+        model?: string;
       }) => ({
         id: msg.id,
         sessionId: msg.sessionId,
@@ -89,6 +89,7 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
         content: msg.content,
         timestamp: msg.timestamp,
         completed: msg.completed,
+        model: msg.model,
         isStreaming: !msg.completed && msg.role === 'assistant',
       })
     );
@@ -121,32 +122,30 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   }, [messages, streamingMessage, chunksData]);
 
   /**
-   * Starts a new chat session with the specified model.
+   * Starts a new chat session.
+   * Model is no longer required - it will be specified with each message.
    */
-  const startSession = useCallback(
-    async (model: string): Promise<string> => {
-      if (!workerId) throw new Error('No worker selected');
+  const startSession = useCallback(async (): Promise<string> => {
+    if (!workerId) throw new Error('No worker selected');
 
-      setIsLoading(true);
-      setError(null);
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        console.log('[useAssistantChat] Starting session with:', { workerId, model });
-        const sessionId = await startSessionMutation({ workerId, model });
-        console.log('[useAssistantChat] Session started:', sessionId);
-        setActiveSessionId(sessionId);
-        return sessionId;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        console.error('[useAssistantChat] Error starting session:', error);
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [workerId, startSessionMutation]
-  );
+    try {
+      console.log('[useAssistantChat] Starting session with workerId:', workerId);
+      const sessionId = await startSessionMutation({ workerId });
+      console.log('[useAssistantChat] Session started:', sessionId);
+      setActiveSessionId(sessionId);
+      return sessionId;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error('[useAssistantChat] Error starting session:', error);
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [workerId, startSessionMutation]);
 
   /**
    * Restores an existing session by its ID.
@@ -202,19 +201,21 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
   }, [activeSessionId, endSessionMutation]);
 
   /**
-   * Sends a message to the active session.
+   * Sends a message to the active session with the specified model.
    * The response will be streamed via subscriptions.
+   * Each message stores the model for audit trail purposes.
    */
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, model: string) => {
       if (!activeSessionId) throw new Error('No active session');
 
       setIsLoading(true);
       setError(null);
 
       try {
-        // Send message - backend will create user message and assistant placeholder
-        await sendMessageMutation({ chatSessionId: activeSessionId, content });
+        console.log('[useAssistantChat] Sending message with model:', model);
+        // Send message with model - backend will create user message and assistant placeholder
+        await sendMessageMutation({ chatSessionId: activeSessionId, content, model });
         // Worker will receive notification and start processing
         // Chunks will arrive via subscribeToChunks subscription
       } catch (err) {
@@ -226,33 +227,6 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
       }
     },
     [activeSessionId, sendMessageMutation]
-  );
-
-  /**
-   * Updates the AI model for the current active session.
-   * Allows switching models mid-conversation.
-   */
-  const updateModel = useCallback(
-    async (model: string): Promise<void> => {
-      if (!activeSessionId) throw new Error('No active session');
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        console.log('[useAssistantChat] Updating model to:', model);
-        await updateSessionModelMutation({ chatSessionId: activeSessionId, model });
-        console.log('[useAssistantChat] Model updated successfully');
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        console.error('[useAssistantChat] Error updating model:', error);
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [activeSessionId, updateSessionModelMutation]
   );
 
   /**
@@ -278,7 +252,6 @@ export function useAssistantChat(workerId: string | null): AssistantChatReturn {
     clearSession,
     messages: messagesWithChunks,
     sendMessage,
-    updateModel,
     isLoading,
     error,
   };

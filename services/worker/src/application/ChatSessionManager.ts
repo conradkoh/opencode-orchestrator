@@ -90,45 +90,27 @@ export class ChatSessionManager {
   }
 
   /**
-   * Start a new chat session with opencode.
+   * Start a new chat session (without creating OpenCode session yet).
+   * OpenCode session will be created lazily when first message arrives with a model.
    * @param chatSessionId - Convex chat session ID (ChatSessionId branded type)
-   * @param model - AI model to use
    */
-  async startSession(chatSessionId: ChatSessionId, model: string): Promise<void> {
-    console.log(`🚀 Starting session ${chatSessionId} with model ${model}`);
+  async startSession(chatSessionId: ChatSessionId): Promise<void> {
+    console.log(
+      `🚀 Registering session ${chatSessionId} (OpenCode session will be created on first message)`
+    );
 
     try {
-      // Store session info FIRST (before async operations)
-      // This prevents race conditions where messages arrive before session is ready
+      // Store session info - OpenCode session will be created when first message arrives
       this.activeSessions.set(chatSessionId, {
         chatSessionId,
-        model,
+        model: '', // Will be set from first message
         startedAt: Date.now(),
-        isInitializing: true,
+        isInitializing: false, // Not initializing yet - will initialize on first message
       });
 
-      // Ensure opencode client is initialized
-      await this.ensureOpencodeClient();
-
-      if (!this.opencodeClient) {
-        throw new Error('Opencode client not initialized');
-      }
-
-      // Create opencode session
-      const opencodeSession = await this.opencodeAdapter.createSession(this.opencodeClient, model);
-      const opencodeSessionId = opencodeSession.id as OpencodeSessionId;
-      console.log(`📝 Opencode session created: ${opencodeSessionId}`);
-
-      // Update session with opencode session ID
-      const session = this.activeSessions.get(chatSessionId);
-      if (session) {
-        session.opencodeSessionId = opencodeSessionId;
-        session.isInitializing = false;
-      }
-
-      console.log(`✅ Session ${chatSessionId} ready (OpenCode: ${opencodeSessionId})`);
+      console.log(`✅ Session ${chatSessionId} registered`);
     } catch (error) {
-      console.error(`❌ Failed to start session ${chatSessionId}:`, error);
+      console.error(`❌ Failed to register session ${chatSessionId}:`, error);
       this.activeSessions.delete(chatSessionId);
       throw error;
     }
@@ -149,43 +131,20 @@ export class ChatSessionManager {
    * @param chatSessionId - Convex chat session ID
    * @param messageId - Message ID to process
    * @param content - Message content
+   * @param model - AI model to use for this message
    */
   async processMessage(
     chatSessionId: ChatSessionId,
     messageId: string,
-    content: string
+    content: string,
+    model: string
   ): Promise<void> {
-    console.log(`📨 Processing message in session ${chatSessionId}:`, content);
+    console.log(`📨 Processing message in session ${chatSessionId} with model ${model}:`, content);
 
     try {
       const session = this.activeSessions.get(chatSessionId);
       if (!session) {
         const errorMsg = `Session ${chatSessionId} not found`;
-        console.error(`❌ ${errorMsg}`);
-        await this.writeError(chatSessionId, messageId, errorMsg);
-        return;
-      }
-
-      // Wait for session to finish initializing
-      if (session.isInitializing) {
-        console.log(`⏳ Waiting for session ${chatSessionId} to finish initializing...`);
-        // Wait up to 30 seconds for initialization
-        const maxWaitTime = 30000;
-        const startTime = Date.now();
-        while (session.isInitializing && Date.now() - startTime < maxWaitTime) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        if (session.isInitializing) {
-          const errorMsg = 'Session initialization timeout';
-          console.error(`❌ ${errorMsg}`);
-          await this.writeError(chatSessionId, messageId, errorMsg);
-          return;
-        }
-        console.log(`✅ Session ${chatSessionId} initialization complete, proceeding with message`);
-      }
-
-      if (!session.opencodeSessionId) {
-        const errorMsg = `No opencode session ID for ${chatSessionId}`;
         console.error(`❌ ${errorMsg}`);
         await this.writeError(chatSessionId, messageId, errorMsg);
         return;
@@ -200,26 +159,46 @@ export class ChatSessionManager {
         return;
       }
 
-      // Fetch latest session data from Convex to get the current model
-      // This ensures we use the latest model if it was changed mid-conversation
-      const activeSessions = await this.convexClient.getActiveSessions();
-      const convexSession = activeSessions.find((s) => s.chatSessionId === chatSessionId);
+      // Create OpenCode session if it doesn't exist yet (lazy initialization)
+      if (!session.opencodeSessionId) {
+        console.log(`📝 Creating OpenCode session for ${chatSessionId} with model ${model}`);
+        session.isInitializing = true;
 
-      // Use the model from Convex if available, otherwise fall back to local session model
-      const modelToUse = convexSession?.model || session.model;
+        try {
+          const opencodeSession = await this.opencodeAdapter.createSession(
+            this.opencodeClient,
+            model
+          );
+          const opencodeSessionId = opencodeSession.id as OpencodeSessionId;
+          console.log(`✅ OpenCode session created: ${opencodeSessionId}`);
 
-      // Update local session model if it changed
-      if (convexSession?.model && convexSession.model !== session.model) {
-        console.log(`🔄 Model changed from ${session.model} to ${convexSession.model}`);
-        session.model = convexSession.model;
+          session.opencodeSessionId = opencodeSessionId;
+          session.model = model;
+          session.isInitializing = false;
+
+          // Notify Convex that session is ready
+          await this.convexClient.sessionReady(chatSessionId, opencodeSessionId);
+        } catch (error) {
+          session.isInitializing = false;
+          const errorMsg = `Failed to create OpenCode session: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(`❌ ${errorMsg}`);
+          await this.writeError(chatSessionId, messageId, errorMsg);
+          return;
+        }
       }
 
-      // Send prompt to opencode and stream response
+      // Update local session model if it changed
+      if (model !== session.model) {
+        console.log(`🔄 Model changed from ${session.model} to ${model}`);
+        session.model = model;
+      }
+
+      // Send prompt to opencode and stream response using the model from the message
       const responseIterator = this.opencodeAdapter.sendPrompt(
         this.opencodeClient,
         validateSessionId(session.opencodeSessionId),
         content,
-        modelToUse
+        model
       );
 
       let fullResponse = '';

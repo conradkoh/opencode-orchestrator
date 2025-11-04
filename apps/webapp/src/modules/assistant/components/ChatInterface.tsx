@@ -77,16 +77,8 @@ export function ChatInterface() {
   const availableModels = useMemo(() => workerModels?.map((m) => m.id) || [], [workerModels]);
 
   const { sessions, loading: sessionsLoading } = useAssistantSessions(selectedWorkerId);
-  const {
-    session,
-    startSession,
-    restoreSession,
-    endSession,
-    clearSession,
-    messages,
-    updateModel,
-    isLoading,
-  } = useAssistantChat(selectedWorkerId);
+  const { session, startSession, restoreSession, endSession, clearSession, messages, isLoading } =
+    useAssistantChat(selectedWorkerId);
 
   // Get sendMessage mutation directly for auto-session creation
   const sendMessageMutation = useSessionMutation(api.chat.sendMessage);
@@ -167,14 +159,6 @@ export function ChatInterface() {
     }
   }, [selectedWorkerId, availableModels, selectedModel]);
 
-  // Sync selected model with session's model when session is restored
-  useEffect(() => {
-    if (session && session.model && session.model !== selectedModel) {
-      console.log('[ChatInterface] Syncing selected model with session model:', session.model);
-      setSelectedModel(session.model);
-    }
-  }, [session, selectedModel]);
-
   // Handle focus after component re-renders (session restore, session end, message send)
   useEffect(() => {
     if (shouldFocusInput) {
@@ -217,6 +201,7 @@ export function ChatInterface() {
   /**
    * Handles sending a message to the active session.
    * Auto-creates a session if none exists.
+   * Passes the currently selected model with each message.
    */
   const handleSendMessage = useCallback(
     async (content: string) => {
@@ -231,7 +216,7 @@ export function ChatInterface() {
         // If no active session, create one first
         if (!session) {
           console.log('[ChatInterface] No active session, creating new session first');
-          const newSessionId = await startSession(selectedModel);
+          const newSessionId = await startSession();
           // Update URL with new session ID
           if (newSessionId) {
             urlActions.setChatSessionId(newSessionId);
@@ -239,11 +224,14 @@ export function ChatInterface() {
           }
         }
 
-        // Send the message using the session ID directly
-        // We can't rely on sendMessage() from the hook because it depends on activeSessionId state
-        // which may not have updated yet
+        // Send the message with the currently selected model
+        // We use the mutation directly to avoid state timing issues
         if (sessionIdToUse) {
-          await sendMessageMutation({ chatSessionId: sessionIdToUse, content });
+          await sendMessageMutation({
+            chatSessionId: sessionIdToUse,
+            content,
+            model: selectedModel,
+          });
           // Trigger focus after state updates
           setShouldFocusInput(true);
         }
@@ -313,29 +301,12 @@ export function ChatInterface() {
 
   /**
    * Handles model selection change.
-   * If there's an active session, updates the session's model.
-   * Otherwise, just updates local state.
+   * Updates local state - model will be sent with next message.
    */
-  const handleModelChange = useCallback(
-    async (model: string) => {
-      console.log('[ChatInterface] Model changed to:', model);
-      setSelectedModel(model);
-
-      // If there's an active session, update the model in the backend
-      if (session && session.status === 'active') {
-        try {
-          console.log('[ChatInterface] Updating session model to:', model);
-          await updateModel(model);
-          console.log('[ChatInterface] Session model updated successfully');
-        } catch (error) {
-          console.error('[ChatInterface] Failed to update session model:', error);
-          // Revert local state on error
-          setSelectedModel(session.model);
-        }
-      }
-    },
-    [session, updateModel]
-  );
+  const handleModelChange = useCallback((model: string) => {
+    console.log('[ChatInterface] Model changed to:', model);
+    setSelectedModel(model);
+  }, []);
 
   /**
    * Handles retrying worker connection
@@ -509,18 +480,12 @@ export function ChatInterface() {
                   {session.status === 'inactive' ? (
                     <>
                       <span className="h-1.5 w-1.5 rounded-full bg-gray-500 dark:bg-gray-400" />
-                      <span>
-                        Session closed • Model:{' '}
-                        <span className="font-medium text-foreground">{session.model}</span>
-                      </span>
+                      <span>Session closed</span>
                     </>
                   ) : (
                     <>
                       <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400 animate-pulse" />
-                      <span>
-                        Session active • Model:{' '}
-                        <span className="font-medium text-foreground">{session.model}</span>
-                      </span>
+                      <span>Session active</span>
                     </>
                   )}
                 </div>

@@ -34,6 +34,21 @@ function _formatTimeAgo(timestamp: number): string {
 }
 
 /**
+ * Format session title as "Session DDMMYYYY_HHMMSS"
+ */
+function _formatSessionTitle(timestamp: number): string {
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear());
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `Session ${day}${month}${year}_${hours}${minutes}${seconds}`;
+}
+
+/**
  * Component for displaying a list of chat sessions for an assistant.
  * Shows active sessions separately from inactive sessions, with ability to restore or start new.
  *
@@ -108,7 +123,9 @@ export function SessionList({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-foreground">{session.model}</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {_formatSessionTitle(session.createdAt)}
+                      </span>
                       <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400" />
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -138,7 +155,9 @@ export function SessionList({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-foreground">{session.model}</span>
+                        <span className="text-sm font-medium text-foreground">
+                          {_formatSessionTitle(session.createdAt)}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <ClockIcon className="h-3 w-3" />

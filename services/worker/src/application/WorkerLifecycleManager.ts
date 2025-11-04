@@ -287,18 +287,18 @@ export class WorkerLifecycleManager implements IWorkerLifecycleManager {
       }
     });
 
-    this.convexClient.onSessionStart(async (sessionId, model) => {
+    this.convexClient.onSessionStart(async (sessionId) => {
       console.log(`📞 Session start callback: ${sessionId}`);
       try {
-        await this.chatManager?.startSession(sessionId, model);
+        await this.chatManager?.startSession(sessionId);
       } catch (error) {
         console.error('❌ Failed to start session:', error);
         // Don't crash the whole worker for session errors
       }
     });
 
-    this.convexClient.onMessage(async (sessionId, messageId, content) => {
-      console.log(`📞 Message callback: ${messageId} in session ${sessionId}`);
+    this.convexClient.onMessage(async (sessionId, messageId, content, model) => {
+      console.log(`📞 Message callback: ${messageId} in session ${sessionId} with model ${model}`);
 
       // Only process messages if we're ready
       if (!this.isReady()) {
@@ -307,7 +307,7 @@ export class WorkerLifecycleManager implements IWorkerLifecycleManager {
       }
 
       try {
-        await this.chatManager?.processMessage(sessionId, messageId, content);
+        await this.chatManager?.processMessage(sessionId, messageId, content, model);
       } catch (error) {
         console.error('❌ Failed to process message:', error);
         // Don't crash the whole worker for message errors
