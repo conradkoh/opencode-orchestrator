@@ -26,8 +26,6 @@ export interface ChatInputWithModelProps {
   availableModels: string[];
   /** Callback fired when model selection changes */
   onModelChange: (model: string) => void;
-  /** Whether there's an active session (disables model selector) */
-  hasActiveSession: boolean;
   /** Whether the input is disabled */
   disabled?: boolean;
   /** Placeholder text for the input */
@@ -53,7 +51,6 @@ export interface ChatInputWithModelProps {
  *   selectedModel="claude-sonnet-4"
  *   availableModels={models}
  *   onModelChange={setModel}
- *   hasActiveSession={!!session}
  *   disabled={isLoading}
  * />
  *
@@ -68,7 +65,6 @@ export const ChatInputWithModel = forwardRef<ChatInputHandle, ChatInputWithModel
       selectedModel,
       availableModels,
       onModelChange,
-      hasActiveSession,
       disabled,
       placeholder = 'Type your message...',
       autoFocus = false,
@@ -181,7 +177,7 @@ export const ChatInputWithModel = forwardRef<ChatInputHandle, ChatInputWithModel
                 models={availableModels}
                 selectedModel={selectedModel}
                 onModelChange={onModelChange}
-                disabled={disabled || hasActiveSession}
+                disabled={disabled}
               />
             </div>
             <Button

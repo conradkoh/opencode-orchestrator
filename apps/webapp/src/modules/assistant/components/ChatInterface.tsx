@@ -152,12 +152,20 @@ export function ChatInterface() {
     }
   }, [urlChatSessionId, selectedWorkerId, session, sessions, restoreSession, urlActions]);
 
-  // Auto-select first model when worker is selected and no model is chosen
+  // Initialize model from session when restoring, or auto-select first model when worker is selected
+  // Only runs when session/worker/models change, NOT when user changes selectedModel
+  // Only initializes if no model is currently selected (preserves user selections)
   useEffect(() => {
     if (selectedWorkerId && availableModels.length > 0 && !selectedModel) {
-      setSelectedModel(availableModels[0]);
+      // If we have a session, use its model (if available in the list)
+      if (session?.model && availableModels.includes(session.model)) {
+        setSelectedModel(session.model);
+      } else {
+        // Otherwise, auto-select first model
+        setSelectedModel(availableModels[0]);
+      }
     }
-  }, [selectedWorkerId, availableModels, selectedModel]);
+  }, [selectedWorkerId, availableModels, session?.model, selectedModel]); // selectedModel only used in condition, not as trigger
 
   // Handle focus after component re-renders (session restore, session end, message send)
   useEffect(() => {
@@ -531,7 +539,6 @@ export function ChatInterface() {
               selectedModel={selectedModel}
               availableModels={availableModels}
               onModelChange={handleModelChange}
-              hasActiveSession={!!session && session.status !== 'inactive'}
               disabled={isLoading || session?.status === 'inactive'}
               placeholder={
                 session?.status === 'inactive'
@@ -566,7 +573,6 @@ export function ChatInterface() {
               selectedModel={selectedModel}
               availableModels={availableModels}
               onModelChange={handleModelChange}
-              hasActiveSession={false}
               disabled={isLoading}
               placeholder="Type your message... (Shift+Enter for new line)"
               autoFocus={true}
