@@ -33,9 +33,9 @@ echo "Copying new .ai folder..."
 cp -r "$TEMP_DIR/.ai" "$PROJECT_ROOT/"
 
 echo ""
-echo "Running init script to distribute commands..."
+echo "Running apply script to distribute commands..."
 cd "$PROJECT_ROOT"
-bash "$PROJECT_ROOT/.ai/init.sh"
+bash "$PROJECT_ROOT/.ai/apply.sh"
 
 echo ""
 echo "Update complete!"

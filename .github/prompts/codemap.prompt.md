@@ -4,12 +4,15 @@ mode: agent
 
 # Codemap Meta Rules
 
+<!-- <section:definition> -->
 ## Definition
 
 A codemap is an index that shows a map to all relevant files for a given feature. It serves as the single source of truth for understanding how a feature is implemented across the codebase.
 
 A projectmap is a high-level architectural overview that documents the entire project's structure, technology stack, and organizational patterns. Unlike codemaps which focus on specific features, a projectmap provides the foundational context for understanding the overall system architecture.
+<!-- </section:definition> -->
 
+<!-- <section:file-requirements> -->
 ## File Requirements
 
 ### Codemaps
@@ -27,14 +30,18 @@ A projectmap is a high-level architectural overview that documents the entire pr
 4. **Template**: MUST follow structure defined in `codemaps/templates/template.projectmap.md`
 5. **Scope**: MUST cover entire project architecture, not individual features
 6. **Maintenance**: MUST be updated when project structure or tech stack changes
+<!-- </section:file-requirements> -->
 
+<!-- <section:file-locations> -->
 ## File Locations
 
 - **Codemap Template**: `codemaps/templates/template.codemap.md` - Use this template when creating new codemaps
 - **Projectmap Template**: `codemaps/templates/template.projectmap.md` - Use this template when creating new projectmaps
 - **Projectmap**: `codemaps/projectmap.md` - High-level project architecture and structure overview
 - **Existing Codemaps**: `codemaps/` directory - Review existing codemaps for reference and patterns
+<!-- </section:file-locations> -->
 
+<!-- <section:required-sections> -->
 ## Required Sections
 
 ### Codemaps
@@ -77,9 +84,11 @@ A projectmap is a high-level architectural overview that documents the entire pr
 5. **Testing Strategy**: Quality assurance approach and coverage
    - Testing framework adoption and gaps
    - Validation strategies across application layers
-   - Quality gates and automated checks
-   - Type safety and compile-time validation
+    - Quality gates and automated checks
+    - Type safety and compile-time validation
+<!-- </section:required-sections> -->
 
+<!-- <section:required-details> -->
 ## Required Details
 
 ### Function Interfaces
@@ -112,14 +121,18 @@ A projectmap is a high-level architectural overview that documents the entire pr
 - **MUST use**: TypeScript interfaces even for non-TypeScript implementations
 - **Purpose**: Provide precision in expressing intent and tie related components together
 - **Scope**: ALL data structures, parameters, and return types
+<!-- </section:required-details> -->
 
+<!-- <section:scope-guidelines> -->
 ## Scope Guidelines
 
 - **Single Flow**: Each codemap MUST represent exactly one user flow or feature workflow
 - **Focused**: NEVER mix multiple unrelated features in one codemap
 - **Complete**: MUST include ALL files necessary for the specific flow to function
 - **Minimal**: SHOULD exclude files not directly related to the flow
+<!-- </section:scope-guidelines> -->
 
+<!-- <section:scope-discipline> -->
 ## Scope Discipline
 
 ### User Request Boundaries
@@ -148,14 +161,18 @@ A projectmap is a high-level architectural overview that documents the entire pr
 - **MUST ask user first**: Before adding features not explicitly requested
 - **MAY suggest**: Additional integrations in a separate "Future Enhancements" section
 - **NEVER assume**: That following all existing patterns is required
+<!-- </section:scope-discipline> -->
 
+<!-- <section:language-standards> -->
 ## Language Standards
 
 - **MUST**: Mandatory requirements, non-negotiable
 - **SHOULD**: Recommended best practices
 - **MAY**: Optional features or alternatives
 - **NEVER**: Prohibited actions or patterns
+<!-- </section:language-standards> -->
 
+<!-- <section:writing-style> -->
 ## Writing Style
 
 - **Low verbosity**: Use concise, precise language
@@ -164,7 +181,9 @@ A projectmap is a high-level architectural overview that documents the entire pr
 - **Structured**: Use consistent formatting and organization
 - **Comprehensive coverage**: Document what exists AND explicitly note what is missing
 - **Practical focus**: Emphasize patterns and libraries that directly impact development workflow
+<!-- </section:writing-style> -->
 
+<!-- <section:primary-interactions> -->
 ## Primary Interactions
 
 ### 1. Plan
@@ -224,7 +243,9 @@ A projectmap is a high-level architectural overview that documents the entire pr
 - Create missing files as defined in codemap
 - Update existing files to conform to contracts
 - Ensure all file paths and structures exist as documented
+<!-- </section:primary-interactions> -->
 
+<!-- <section:validation-rules> -->
 ## Validation Rules
 
 ### Codemaps
@@ -248,3 +269,70 @@ A projectmap is a high-level architectural overview that documents the entire pr
 8. Testing strategy MUST explicitly document validation approaches or gaps where absent
 9. Architecture documentation MUST be updated when major structural changes occur
 10. Technology versions SHOULD be documented where relevant for major dependencies
+<!-- </section:validation-rules> -->
+
+<!-- <section:ai-agent-behavior> -->
+## AI Agent Behavior
+
+### Typical Codemap Usage Workflow
+
+When working with codemaps, AI agents SHOULD follow this standard workflow:
+
+#### 1. Locate the Project Map
+- Read `codemaps/projectmap.md` to understand overall project architecture
+- Identify relevant technology stack and patterns
+- Understand directory structure and conventions
+
+#### 2. List All Codemaps
+- Scan `codemaps/` directory for existing feature documentation
+- Review codemap filenames to identify potentially relevant features
+- Note codemap naming patterns and organizational structure
+
+#### 3. Decide on Codemap Action
+Based on filename and contents, determine ONE of:
+
+**a) Creating a New Codemap**
+- Feature does not exist in codebase
+- No existing codemap matches the user's request
+- Use `codemaps/templates/template.codemap.md` as starting point
+- Follow naming convention: `$featurename.codemap.md`
+
+**b) Updating an Existing Codemap**
+- Feature exists and has an associated codemap
+- User requests modifications to existing feature
+- Changes require documentation updates
+- Review current state before planning modifications
+
+**c) Referencing a Codemap (No Update Required)**
+- Codemap accurately reflects current implementation
+- User request is for information or understanding only
+- Implementation changes are not needed
+- Use codemap as reference to answer questions
+
+#### 4. Determine User's Goal and Work Proactively
+After deciding on codemap action, proceed without further prompting:
+
+- **For new codemaps**: Create codemap structure, plan implementation, and apply changes
+- **For updates**: Modify codemap to reflect planned changes, then implement
+- **For reference**: Use codemap information to provide answers or guidance
+
+Key principles:
+- Execute the complete workflow autonomously
+- Use codemaps as source of truth for implementation
+- Maintain consistency with established patterns
+- Document all architectural decisions
+
+#### 5. Ask Clarification Questions (After Implementation)
+ONLY after completing initial implementation:
+
+- Identify ambiguities or edge cases discovered during work
+- Ask targeted questions about specific decisions
+- Request feedback on implementation approach
+- Iterate based on user responses
+
+Important:
+- Do NOT ask clarifying questions upfront unless absolutely necessary
+- Take initiative and make reasonable decisions based on context
+- Prefer action over prolonged planning discussions
+- Use codemaps to reduce ambiguity and decision paralysis
+<!-- </section:ai-agent-behavior> -->

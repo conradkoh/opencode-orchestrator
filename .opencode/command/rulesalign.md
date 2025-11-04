@@ -59,8 +59,6 @@ Follow the cross-surface workflow (reference the framework document for principl
 - **MAY defer** low-risk cosmetic differences (formatting-only) but must log them as follow-ups if left unresolved.
 
 ---
-
-<!-- OPENCODE USER INPUT BINDING: ALWAYS INCLUDE IN COMMANDS -->
 <!-- Ignore section if arguments are not replaced -->
 <userinput>
 $ARGUMENTS

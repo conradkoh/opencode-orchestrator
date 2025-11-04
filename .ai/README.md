@@ -11,7 +11,7 @@ This directory contains the canonical source of truth for AI assistant commands 
 │   ├── codemap.md     # Codemap generation command
 │   └── rulesalign.md  # Cross-surface alignment command
 ├── init.md            # Manual initialization guide
-├── init.sh            # Automated initialization script
+├── apply.sh           # Automated apply script (distributes commands)
 ├── structure.md       # Framework documentation
 └── README.md          # This file
 ```
@@ -20,22 +20,22 @@ This directory contains the canonical source of truth for AI assistant commands 
 
 ### Automated Initialization
 
-Run the initialization script to automatically distribute commands to all surfaces:
+Run the apply script to automatically distribute commands to all surfaces:
 
 ```bash
-.ai/init.sh
+.ai/apply.sh
 ```
 
 **Preview changes first (recommended):**
 
 ```bash
-.ai/init.sh --dry-run
+.ai/apply.sh --dry-run
 ```
 
 **Force run with uncommitted changes:**
 
 ```bash
-.ai/init.sh --force
+.ai/apply.sh --force
 ```
 
 This script will:
@@ -62,7 +62,7 @@ If you prefer manual control, follow the step-by-step guide in [`init.md`](./ini
 All command definitions in `.ai/commands/*.md` are the **source of truth** and should be:
 
 - ✅ Modified only in `.ai/commands/`
-- ✅ Distributed to other surfaces using `init.sh`
+- ✅ Distributed to other surfaces using `apply.sh`
 - ❌ Never edited directly in `.github/prompts/` or `.cursor/commands/`
 
 ### Current Commands
@@ -96,14 +96,14 @@ The `.cursor/rules/` directory contains **Cursor-specific rules** that are:
 ### Adding a New Command
 
 1. Create `new-command.md` in `.ai/commands/`
-2. Run `.ai/init.sh` to distribute it
+2. Run `.ai/apply.sh` to distribute it
 3. Verify the output in `.github/prompts/` and `.cursor/commands/`
 4. Commit the changes
 
 ### Updating an Existing Command
 
 1. Edit the source file in `.ai/commands/`
-2. Run `.ai/init.sh` to sync changes
+2. Run `.ai/apply.sh` to sync changes
 3. Commit all modified surfaces together
 
 ### Aligning All Surfaces
@@ -132,7 +132,7 @@ See [`structure.md`](./structure.md) for:
 
 ## Best Practices
 
-1. **Keep target directories clean**: Run `init.sh` when `.cursor/` and `.github/` are clean, or use `--force` if needed
+1. **Keep target directories clean**: Run `apply.sh` when `.cursor/` and `.github/` are clean, or use `--force` if needed
 2. **Source of truth**: Edit commands only in `.ai/commands/`
 3. **Batch changes**: Commit command updates and their distributions together
 4. **Verify**: Review generated files before committing
@@ -149,24 +149,24 @@ You have three options:
 ```bash
 git add .cursor/ .github/
 git commit -m "Update AI surfaces"
-.ai/init.sh
+.ai/apply.sh
 ```
 
 **Option 2:** Use the `--force` flag to override:
 
 ```bash
-.ai/init.sh --force
+.ai/apply.sh --force
 ```
 
 **Option 3:** Preview changes without modifying files:
 
 ```bash
-.ai/init.sh --dry-run
+.ai/apply.sh --dry-run
 ```
 
 ### Commands not appearing in editor
 
-After running `init.sh`, you may need to:
+After running `apply.sh`, you may need to:
 
 - Reload your editor
 - Restart the AI assistant extension

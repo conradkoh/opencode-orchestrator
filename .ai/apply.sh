@@ -1,15 +1,18 @@
 #!/bin/bash
 
-# AI Assistant Initialization Script
+# AI Assistant Apply Script
 # Automates the distribution of commands from .ai/commands/ to appropriate surfaces
 # with correct headers and file formats.
+#
+# Sections marked with INIT: Run only on first install
+# Sections marked with INSTALL: Run on subsequent updates
 
 set -e  # Exit on error
 
 # Help function
 show_help() {
     cat << EOF
-Usage: init.sh [OPTIONS]
+Usage: apply.sh [OPTIONS]
 
 Automates the distribution of AI assistant commands and instructions to all
 configured surfaces (GitHub Copilot, Cursor, etc.).
@@ -21,21 +24,22 @@ OPTIONS:
 
 EXAMPLES:
     # Preview what would be changed
-    .ai/init.sh --dry-run
+    .ai/apply.sh --dry-run
 
     # Apply changes
-    .ai/init.sh
+    .ai/apply.sh
     
     # Force apply even with uncommitted changes in .cursor or .github
-    .ai/init.sh --force
+    .ai/apply.sh --force
 
 PROCESS:
     1. Verifies .cursor/, .github/, and .opencode/ directories are clean (unless --force)
-    2. Creates target directories if needed
-    3. Distributes commands from .ai/commands/ to:
+    2. [INIT] Creates target directories if needed
+    3. [INSTALL] Distributes commands from .ai/commands/ to:
        - .github/prompts/*.prompt.md
        - .cursor/commands/*.md
        - .opencode/command/*.md
+    4. [INIT] Copies codemap templates from .ai/data/codemaps/templates/
 
 SOURCE OF TRUTH:
     • Commands: .ai/commands/*.md
@@ -65,7 +69,7 @@ for arg in "$@"; do
             ;;
         *)
             echo "Error: Unknown option: $arg"
-            echo "Run 'init.sh --help' for usage information."
+            echo "Run 'apply.sh --help' for usage information."
             exit 1
             ;;
     esac
@@ -84,9 +88,9 @@ cd "$REPO_ROOT"
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 if [ "$DRY_RUN" = true ]; then
-    echo -e "${BLUE}  AI Assistant Initialization (DRY RUN)${NC}"
+    echo -e "${BLUE}  AI Assistant Apply (DRY RUN)${NC}"
 else
-    echo -e "${BLUE}  AI Assistant Initialization${NC}"
+    echo -e "${BLUE}  AI Assistant Apply${NC}"
 fi
 if [ "$FORCE" = true ]; then
     echo -e "${YELLOW}  (FORCE MODE: Ignoring uncommitted changes)${NC}"
@@ -94,7 +98,7 @@ fi
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 echo
 
-# Step 0: Check git status for target directories
+# Step 0: Check git status for target directories (ALWAYS RUN)
 echo -e "${YELLOW}Step 0: Checking target directories...${NC}"
 
 # Check if .cursor/, .github/, or .opencode/ have uncommitted changes
@@ -114,7 +118,7 @@ if [[ -n "$CURSOR_CHANGES" || -n "$GITHUB_CHANGES" || -n "$OPENCODE_CHANGES" ]];
         if [[ -n "$OPENCODE_CHANGES" ]]; then
             echo -e "${YELLOW}  .opencode/ has changes${NC}"
         fi
-        echo -e "${YELLOW}  Please commit or stash changes in these directories before running init.${NC}"
+        echo -e "${YELLOW}  Please commit or stash changes in these directories before running apply.${NC}"
         echo -e "${YELLOW}  Or use --force to override this check, or --dry-run to preview changes.${NC}"
         exit 1
     elif [ "$FORCE" = true ]; then
@@ -148,8 +152,8 @@ CURRENT_BRANCH=$(git branch --show-current)
 echo -e "  Current branch: ${BLUE}${CURRENT_BRANCH}${NC}"
 echo
 
-# Step 1: Create target directories if they don't exist
-echo -e "${YELLOW}Step 1: Ensuring target directories exist...${NC}"
+# Step 1: Create target directories if they don't exist (INIT: First install only)
+echo -e "${YELLOW}Step 1 [INIT]: Ensuring target directories exist...${NC}"
 if [ "$DRY_RUN" = false ]; then
     mkdir -p .github/prompts
     mkdir -p .cursor/commands
@@ -164,8 +168,8 @@ else
 fi
 echo
 
-# Step 2: Process command files from .ai/commands/
-echo -e "${YELLOW}Step 2: Distributing commands from .ai/commands/...${NC}"
+# Step 2: Process command files from .ai/commands/ (INSTALL: Subsequent runs)
+echo -e "${YELLOW}Step 2 [INSTALL]: Distributing commands from .ai/commands/...${NC}"
 
 if [ ! -d ".ai/commands" ]; then
     echo -e "${RED}✗ Directory .ai/commands/ not found${NC}"
@@ -240,8 +244,8 @@ else
 fi
 echo
 
-# Step 3: Copy codemap templates
-echo -e "${YELLOW}Step 3: Copying codemap templates...${NC}"
+# Step 3: Copy codemap templates (INIT: First install only)
+echo -e "${YELLOW}Step 3 [INIT]: Copying codemap templates...${NC}"
 
 if [ ! -d ".ai/data/codemaps/templates" ]; then
     echo -e "${RED}✗ Directory .ai/data/codemaps/templates/ not found${NC}"
@@ -281,12 +285,12 @@ else
 fi
 echo
 
-# Step 4: Summary
+# Step 4: Summary (ALWAYS RUN)
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 if [ "$DRY_RUN" = true ]; then
     echo -e "${GREEN}✓ Dry run complete! No files were modified.${NC}"
 else
-    echo -e "${GREEN}✓ Initialization complete!${NC}"
+    echo -e "${GREEN}✓ Apply complete!${NC}"
 fi
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 echo
@@ -312,7 +316,7 @@ echo -e "      └─→ codemaps/templates/<template>"
 echo
 if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}Next Steps:${NC}"
-    echo -e "  1. Run without --dry-run to apply changes: ${BLUE}.ai/init.sh${NC}"
+    echo -e "  1. Run without --dry-run to apply changes: ${BLUE}.ai/apply.sh${NC}"
     echo -e "  2. Or review the command files in .ai/commands/"
 else
     echo -e "${YELLOW}Next Steps:${NC}"
@@ -325,7 +329,10 @@ echo -e "${YELLOW}Note:${NC}"
 echo -e "  • This script treats .ai/commands/*.md as the source of truth"
 echo -e "  • Instructions in .github/instructions/ are used by GitHub Copilot only"
 echo -e "  • Cursor-specific rules are manually managed in .cursor/rules/"
+echo -e "  • Sections marked [INIT] should only run on first install"
+echo -e "  • Sections marked [INSTALL] run on subsequent updates"
 if [ "$DRY_RUN" = true ]; then
-    echo -e "  • Run ${BLUE}.ai/init.sh${NC} without --dry-run to apply changes"
+    echo -e "  • Run ${BLUE}.ai/apply.sh${NC} without --dry-run to apply changes"
 fi
 echo
+

@@ -349,8 +349,6 @@ function _validateEmail(email: string): boolean {
 This systematic approach ensures no files are missed and all code meets consistent quality standards.
 
 ---
-
-<!-- OPENCODE USER INPUT BINDING: ALWAYS INCLUDE IN COMMANDS -->
 <!-- Ignore section if arguments are not replaced -->
 <userinput>
 $ARGUMENTS
