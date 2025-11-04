@@ -57,8 +57,13 @@ async function main() {
       model
     );
     for await (const chunk of responseIterator) {
-      process.stdout.write(chunk);
-      fullResponse += chunk;
+      if (chunk.content) {
+        process.stdout.write(chunk.content);
+        fullResponse += chunk.content;
+      }
+      if (chunk.reasoning) {
+        console.log(`\n   [Reasoning: ${chunk.reasoning}]`);
+      }
     }
 
     console.log('\n   ─────────────────────────────────────────');
