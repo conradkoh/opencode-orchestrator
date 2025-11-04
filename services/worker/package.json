@@ -9,7 +9,7 @@
     "dev": "bun --watch src/entries/dev.ts",
     "opencode-orchestrator": "bun run src/entries/orchestrator.ts",
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
     "test:unit": "vitest run src/__tests__/domain src/__tests__/application",
     "test:integration": "vitest run src/__tests__/integration",
     "test:e2e": "vitest run src/__tests__/e2e",
