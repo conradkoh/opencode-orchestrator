@@ -82,6 +82,8 @@ export const create = mutation({
  * @param machineId - Machine ID from token
  * @param workerId - Worker ID from token
  * @param secret - Cryptographic secret from token
+ * @param workingDirectory - Working directory path where worker operates
+ * @param username - System username from worker environment
  * @returns Authorization status and worker info
  */
 export const register = mutation({
@@ -89,6 +91,8 @@ export const register = mutation({
     machineId: v.string(),
     workerId: v.string(),
     secret: v.string(),
+    workingDirectory: v.string(),
+    username: v.string(),
   },
   handler: async (ctx, args) => {
     // Find worker by machine ID and worker ID
@@ -110,10 +114,12 @@ export const register = mutation({
 
     // Check if already approved (approval status is independent of operational status)
     if (worker.approvalStatus === 'approved') {
-      // Update to online
+      // Update to online and store working directory and username
       await ctx.db.patch(worker._id, {
         status: 'online',
         lastHeartbeat: Date.now(),
+        workingDirectory: args.workingDirectory,
+        username: args.username,
       });
 
       // Update machine status
@@ -130,7 +136,12 @@ export const register = mutation({
       };
     }
 
-    // Still pending authorization
+    // Still pending authorization - store working directory and username for display
+    await ctx.db.patch(worker._id, {
+      workingDirectory: args.workingDirectory,
+      username: args.username,
+    });
+
     return {
       approvalStatus: 'pending' as const,
       status: 'offline' as const,
@@ -278,6 +289,8 @@ export const list = query({
       createdAt: worker.createdAt,
       approvedAt: worker.approvedAt,
       lastHeartbeat: worker.lastHeartbeat,
+      workingDirectory: worker.workingDirectory,
+      username: worker.username,
     }));
   },
 });
@@ -319,6 +332,8 @@ export const getByMachineAndWorker = query({
       lastHeartbeat: worker.lastHeartbeat,
       connectRequestedAt: worker.connectRequestedAt,
       connectedAt: worker.connectedAt,
+      workingDirectory: worker.workingDirectory,
+      username: worker.username,
     };
   },
 });
@@ -366,6 +381,8 @@ export const listPending = query({
       approvalStatus: worker.approvalStatus as 'pending',
       status: worker.status,
       createdAt: worker.createdAt,
+      workingDirectory: worker.workingDirectory,
+      username: worker.username,
     }));
   },
 });

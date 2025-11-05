@@ -246,6 +246,10 @@ export interface Worker {
   approvedAt?: number;
   /** Timestamp of last heartbeat/activity from the worker */
   lastHeartbeat?: number;
+  /** Working directory path where worker operates */
+  workingDirectory?: string;
+  /** System username from worker environment */
+  username?: string;
 }
 
 /**
@@ -264,6 +268,10 @@ export interface PendingWorker {
   status: 'offline';
   /** Timestamp when the worker was created */
   createdAt: number;
+  /** Working directory path where worker operates */
+  workingDirectory?: string;
+  /** System username from worker environment */
+  username?: string;
 }
 
 /**

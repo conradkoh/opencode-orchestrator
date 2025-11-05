@@ -1,3 +1,4 @@
+import * as os from 'node:os';
 import { api } from '@workspace/backend/convex/_generated/api';
 import { ConvexClient, ConvexHttpClient } from 'convex/browser';
 import type { ChatSessionId, OpencodeSessionId } from '../../../../backend/convex/types/sessionIds';
@@ -68,6 +69,8 @@ export class ConvexClientAdapter {
         machineId: this.config.machineId,
         workerId: this.config.workerId,
         secret: this.config.secret,
+        workingDirectory: this.config.workingDirectory,
+        username: os.userInfo().username,
       });
 
       // If approved, start heartbeat and chat subscriptions

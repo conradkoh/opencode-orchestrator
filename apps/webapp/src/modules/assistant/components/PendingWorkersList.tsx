@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckIcon, ClockIcon, XIcon } from 'lucide-react';
+import { CheckIcon, ClockIcon, FolderIcon, UserIcon, XIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useApproveWorker } from '../hooks/useApproveWorker';
 import { usePendingWorkers } from '../hooks/usePendingWorkers';
 import { useRejectWorker } from '../hooks/useRejectWorker';
+import { formatPathToHome } from '../utils/pathFormatter';
 
 /**
  * Props for PendingWorkersList component.
@@ -112,24 +113,44 @@ export function PendingWorkersList({ machineId }: PendingWorkersListProps) {
             {workers.map((worker) => (
               <div
                 key={worker.workerId}
-                className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4"
+                className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-3.5"
               >
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-foreground">
+                <div className="flex-1 space-y-2 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-foreground text-sm">
                       {worker.name || `Worker ${worker.workerId.slice(0, 8)}...`}
                     </p>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300 shrink-0">
                       <ClockIcon className="h-3 w-3" />
                       Pending
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Worker ID: <code className="text-xs">{worker.workerId}</code>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Requested: {new Date(worker.createdAt).toLocaleString()}
-                  </p>
+                  {(worker.workingDirectory || worker.username) && (
+                    <div className="space-y-1.5 pt-1">
+                      {worker.workingDirectory && (
+                        <div className="flex items-start gap-2 text-xs">
+                          <FolderIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                          <span className="font-mono text-muted-foreground break-all leading-relaxed">
+                            {formatPathToHome(worker.workingDirectory, worker.username)}
+                          </span>
+                        </div>
+                      )}
+                      {worker.username && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <UserIcon className="h-3.5 w-3.5 shrink-0" />
+                          <span>{worker.username}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="space-y-1 pt-1 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground">
+                      Worker ID: <code className="text-xs font-mono">{worker.workerId}</code>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Requested: {new Date(worker.createdAt).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">

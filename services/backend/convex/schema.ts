@@ -269,6 +269,8 @@ export default defineSchema({
     lastHeartbeat: v.optional(v.number()), // Last activity timestamp
     connectRequestedAt: v.optional(v.number()), // When frontend requested connection
     connectedAt: v.optional(v.number()), // When worker completed connection
+    workingDirectory: v.optional(v.string()), // Working directory path where worker operates
+    username: v.optional(v.string()), // System username from worker environment
   })
     .index('by_worker_id', ['workerId'])
     .index('by_machine_id', ['machineId'])

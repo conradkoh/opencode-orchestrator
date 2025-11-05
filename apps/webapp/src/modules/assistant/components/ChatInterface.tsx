@@ -8,6 +8,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
   ServerIcon,
+  UserIcon,
   XIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,6 +32,7 @@ import { useConnectWorker } from '../hooks/useConnectWorker';
 import { useMachines } from '../hooks/useMachines';
 import { useWorkerModels } from '../hooks/useWorkerModels';
 import { useWorkers } from '../hooks/useWorkers';
+import { formatPathToHome } from '../utils/pathFormatter';
 import { AssistantSelector } from './AssistantSelector';
 import { type ChatInputHandle, ChatInputWithModel } from './ChatInputWithModel';
 import { ChatMessageList } from './ChatMessageList';
@@ -418,38 +420,61 @@ export function ChatInterface() {
                   <WorkerActionMenu machineId={selectedMachineId} />
                 </div>
                 {selectedWorker && !session && (
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <Badge
-                      variant={
-                        isConnecting
-                          ? 'outline'
-                          : selectedWorker.status === 'online'
-                            ? 'default'
-                            : 'secondary'
-                      }
-                      className="gap-1.5"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <RefreshCwIcon className="h-3 w-3 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              selectedWorker.status === 'online'
-                                ? 'bg-green-500 dark:bg-green-400'
-                                : 'bg-gray-400 dark:bg-gray-500'
-                            }`}
-                          />
-                          {selectedWorker.status === 'online' ? 'Online' : 'Offline'}
-                        </>
-                      )}
-                    </Badge>
-                    <span className="text-muted-foreground font-mono">
-                      {selectedWorker.name || `Worker ${selectedWorker.workerId.slice(0, 8)}`}
-                    </span>
+                  <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          isConnecting
+                            ? 'outline'
+                            : selectedWorker.status === 'online'
+                              ? 'default'
+                              : 'secondary'
+                        }
+                        className="gap-1.5 px-2 py-0.5"
+                      >
+                        {isConnecting ? (
+                          <>
+                            <RefreshCwIcon className="h-3 w-3 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                selectedWorker.status === 'online'
+                                  ? 'bg-green-500 dark:bg-green-400'
+                                  : 'bg-gray-400 dark:bg-gray-500'
+                              }`}
+                            />
+                            {selectedWorker.status === 'online' ? 'Online' : 'Offline'}
+                          </>
+                        )}
+                      </Badge>
+                      <span className="text-sm font-medium text-foreground">
+                        {selectedWorker.name || `Worker ${selectedWorker.workerId.slice(0, 8)}`}
+                      </span>
+                    </div>
+                    {(selectedWorker.workingDirectory || selectedWorker.username) && (
+                      <div className="space-y-1.5 pt-1 border-t border-border/50">
+                        {selectedWorker.workingDirectory && (
+                          <div className="flex items-start gap-2 text-xs">
+                            <FolderIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                            <span className="font-mono text-muted-foreground break-all leading-relaxed">
+                              {formatPathToHome(
+                                selectedWorker.workingDirectory,
+                                selectedWorker.username
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        {selectedWorker.username && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <UserIcon className="h-3.5 w-3.5 shrink-0" />
+                            <span>{selectedWorker.username}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </>

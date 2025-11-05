@@ -1,6 +1,14 @@
 'use client';
 
-import { ActivityIcon, CheckCircle2Icon, CircleIcon, ClockIcon, Trash2Icon } from 'lucide-react';
+import {
+  ActivityIcon,
+  CheckCircle2Icon,
+  CircleIcon,
+  ClockIcon,
+  FolderIcon,
+  Trash2Icon,
+  UserIcon,
+} from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import {
   AlertDialog,
@@ -19,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { useRemoveWorker } from '../hooks/useRemoveWorker';
 import { useWorkers } from '../hooks/useWorkers';
 import type { Worker } from '../types';
+import { formatPathToHome } from '../utils/pathFormatter';
 
 /**
  * Props for WorkersList component.
@@ -266,30 +275,50 @@ function WorkerItem({ worker, onRemove, statusColor, isRemoving }: WorkerItemPro
   const StatusIcon = config.icon;
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-3">
-      <div className="flex-1 space-y-1">
-        <div className="flex items-center gap-2">
-          <p className="font-medium text-foreground">
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-3.5">
+      <div className="flex-1 space-y-2 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium text-foreground text-sm">
             {worker.name || `Worker ${worker.workerId.slice(0, 8)}...`}
           </p>
-          <Badge className={`gap-1 ${config.badge}`}>
+          <Badge className={`gap-1 ${config.badge} shrink-0`}>
             <StatusIcon className="h-3 w-3" />
             {config.label}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Worker ID: <code className="text-xs">{worker.workerId}</code>
-        </p>
-        {worker.lastHeartbeat && (
-          <p className="text-xs text-muted-foreground">
-            Last seen: {new Date(worker.lastHeartbeat).toLocaleString()}
-          </p>
+        {(worker.workingDirectory || worker.username) && (
+          <div className="space-y-1.5 pt-1">
+            {worker.workingDirectory && (
+              <div className="flex items-start gap-2 text-xs">
+                <FolderIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                <span className="font-mono text-muted-foreground break-all leading-relaxed">
+                  {formatPathToHome(worker.workingDirectory, worker.username)}
+                </span>
+              </div>
+            )}
+            {worker.username && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <UserIcon className="h-3.5 w-3.5 shrink-0" />
+                <span>{worker.username}</span>
+              </div>
+            )}
+          </div>
         )}
-        {worker.approvedAt && (
+        <div className="space-y-1 pt-1 border-t border-border/50">
           <p className="text-xs text-muted-foreground">
-            Approved: {new Date(worker.approvedAt).toLocaleString()}
+            Worker ID: <code className="text-xs font-mono">{worker.workerId}</code>
           </p>
-        )}
+          {worker.lastHeartbeat && (
+            <p className="text-xs text-muted-foreground">
+              Last seen: {new Date(worker.lastHeartbeat).toLocaleString()}
+            </p>
+          )}
+          {worker.approvedAt && (
+            <p className="text-xs text-muted-foreground">
+              Approved: {new Date(worker.approvedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
       </div>
 
       <Button
@@ -297,7 +326,7 @@ function WorkerItem({ worker, onRemove, statusColor, isRemoving }: WorkerItemPro
         size="sm"
         onClick={() => onRemove(worker.workerId, worker.name)}
         disabled={isRemoving}
-        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
         title="Remove worker"
       >
         <Trash2Icon className="h-4 w-4" />
