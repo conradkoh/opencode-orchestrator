@@ -4,6 +4,8 @@ import { SendIcon } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import type { Assistant } from '../types';
+import { AssistantSelector } from './AssistantSelector';
 import { ModelSelector } from './ModelSelector';
 
 /**
@@ -32,6 +34,18 @@ export interface ChatInputWithModelProps {
   placeholder?: string;
   /** Whether to auto-focus the input on mount */
   autoFocus?: boolean;
+  /** Available workers/assistants for selection */
+  workers?: Assistant[];
+  /** Currently selected worker ID */
+  selectedWorkerId?: string | null;
+  /** Callback fired when worker selection changes */
+  onWorkerChange?: (workerId: string) => void;
+  /** Map of worker IDs to their working directories */
+  workerWorkingDirectories?: Record<string, string>;
+  /** Map of worker IDs to their usernames */
+  workerUsernames?: Record<string, string>;
+  /** Whether worker selector is disabled */
+  workersDisabled?: boolean;
 }
 
 /**
@@ -68,6 +82,12 @@ export const ChatInputWithModel = forwardRef<ChatInputHandle, ChatInputWithModel
       disabled,
       placeholder = 'Type your message...',
       autoFocus = false,
+      workers = [],
+      selectedWorkerId = null,
+      onWorkerChange,
+      workerWorkingDirectories = {},
+      workerUsernames = {},
+      workersDisabled = false,
     },
     ref
   ) {
@@ -170,8 +190,20 @@ export const ChatInputWithModel = forwardRef<ChatInputHandle, ChatInputWithModel
             />
           </div>
 
-          {/* Model Selector and Send Button Row */}
+          {/* Worker Selector, Model Selector and Send Button Row */}
           <div className="flex items-center gap-2">
+            {workers.length > 0 && onWorkerChange && (
+              <div className="flex-1">
+                <AssistantSelector
+                  assistants={workers}
+                  selectedAssistantId={selectedWorkerId}
+                  onAssistantChange={onWorkerChange}
+                  disabled={workersDisabled || disabled}
+                  workingDirectories={workerWorkingDirectories}
+                  usernames={workerUsernames}
+                />
+              </div>
+            )}
             <div className="flex-1">
               <ModelSelector
                 models={availableModels}

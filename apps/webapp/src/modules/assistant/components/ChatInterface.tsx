@@ -2,15 +2,7 @@
 
 import { api } from '@workspace/backend/convex/_generated/api';
 import { useSessionMutation } from 'convex-helpers/react/sessions';
-import {
-  AlertCircleIcon,
-  FolderIcon,
-  PlusIcon,
-  RefreshCwIcon,
-  ServerIcon,
-  UserIcon,
-  XIcon,
-} from 'lucide-react';
+import { AlertCircleIcon, PlusIcon, RefreshCwIcon, ServerIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -23,7 +15,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAppUrlState } from '../hooks/useAppUrlState';
 import { useAssistantChat } from '../hooks/useAssistantChat';
@@ -32,13 +23,11 @@ import { useConnectWorker } from '../hooks/useConnectWorker';
 import { useMachines } from '../hooks/useMachines';
 import { useWorkerModels } from '../hooks/useWorkerModels';
 import { useWorkers } from '../hooks/useWorkers';
-import { formatPathToHome } from '../utils/pathFormatter';
-import { AssistantSelector } from './AssistantSelector';
+import type { Assistant } from '../types';
 import { type ChatInputHandle, ChatInputWithModel } from './ChatInputWithModel';
 import { ChatMessageList } from './ChatMessageList';
 import { MachineSelector } from './MachineSelector';
 import { SessionHistoryModal } from './SessionHistoryModal';
-import { WorkerActionMenu } from './WorkerActionMenu';
 
 /**
  * Main chat interface component for orchestrating assistants.
@@ -87,6 +76,46 @@ export function ChatInterface() {
     () => workers?.find((w) => w.workerId === selectedWorkerId),
     [workers, selectedWorkerId]
   );
+
+  // Prepare workers as Assistant array for ChatInputWithModel
+  const workersAsAssistants = useMemo<Assistant[]>(() => {
+    if (!workers) return [];
+    return workers
+      .filter((w) => w.approvalStatus === 'approved')
+      .map((w) => ({
+        assistantId: w.workerId,
+        machineId: w.machineId,
+        machineName: machines?.find((m) => m.machineId === w.machineId)?.name || '',
+        workingDirectory: w.name || w.workerId,
+        displayName: w.name || `Worker ${w.workerId.slice(0, 8)}`,
+        status: w.status === 'online' ? 'online' : 'offline',
+        activeSessionCount: 0,
+        availableModels: [],
+      }));
+  }, [workers, machines]);
+
+  // Create maps for working directories and usernames
+  const workerWorkingDirectories = useMemo(() => {
+    if (!workers) return {};
+    const map: Record<string, string> = {};
+    workers.forEach((w) => {
+      if (w.workingDirectory) {
+        map[w.workerId] = w.workingDirectory;
+      }
+    });
+    return map;
+  }, [workers]);
+
+  const workerUsernames = useMemo(() => {
+    if (!workers) return {};
+    const map: Record<string, string> = {};
+    workers.forEach((w) => {
+      if (w.username) {
+        map[w.workerId] = w.username;
+      }
+    });
+    return map;
+  }, [workers]);
 
   // Get available models from worker (fetched from opencode)
   const { models: workerModels } = useWorkerModels(selectedWorkerId);
@@ -386,112 +415,6 @@ export function ChatInterface() {
             disabled={machinesLoading || !!session}
           />
         </div>
-
-        {/* Worker Selector - Only show if machine is selected */}
-        {selectedMachineId && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <FolderIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">Worker</span>
-            </div>
-            {workers && workers.length > 0 ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <AssistantSelector
-                      assistants={workers
-                        .filter((w) => w.approvalStatus === 'approved')
-                        .map((w) => ({
-                          assistantId: w.workerId,
-                          machineId: w.machineId,
-                          machineName:
-                            machines?.find((m) => m.machineId === w.machineId)?.name || '',
-                          workingDirectory: w.name || w.workerId,
-                          displayName: w.name || `Worker ${w.workerId.slice(0, 8)}`,
-                          status: w.status === 'online' ? 'online' : 'offline',
-                          activeSessionCount: 0,
-                          availableModels: [],
-                        }))}
-                      selectedAssistantId={selectedWorkerId}
-                      onAssistantChange={handleWorkerChange}
-                      disabled={workersLoading || !!session}
-                    />
-                  </div>
-                  <WorkerActionMenu machineId={selectedMachineId} />
-                </div>
-                {selectedWorker && !session && (
-                  <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          isConnecting
-                            ? 'outline'
-                            : selectedWorker.status === 'online'
-                              ? 'default'
-                              : 'secondary'
-                        }
-                        className="gap-1.5 px-2 py-0.5"
-                      >
-                        {isConnecting ? (
-                          <>
-                            <RefreshCwIcon className="h-3 w-3 animate-spin" />
-                            Connecting...
-                          </>
-                        ) : (
-                          <>
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                                selectedWorker.status === 'online'
-                                  ? 'bg-green-500 dark:bg-green-400'
-                                  : 'bg-gray-400 dark:bg-gray-500'
-                              }`}
-                            />
-                            {selectedWorker.status === 'online' ? 'Online' : 'Offline'}
-                          </>
-                        )}
-                      </Badge>
-                      <span className="text-sm font-medium text-foreground">
-                        {selectedWorker.name || `Worker ${selectedWorker.workerId.slice(0, 8)}`}
-                      </span>
-                    </div>
-                    {(selectedWorker.workingDirectory || selectedWorker.username) && (
-                      <div className="space-y-1.5 pt-1 border-t border-border/50">
-                        {selectedWorker.workingDirectory && (
-                          <div className="flex items-start gap-2 text-xs">
-                            <FolderIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                            <span className="font-mono text-muted-foreground break-all leading-relaxed">
-                              {formatPathToHome(
-                                selectedWorker.workingDirectory,
-                                selectedWorker.username
-                              )}
-                            </span>
-                          </div>
-                        )}
-                        {selectedWorker.username && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <UserIcon className="h-3.5 w-3.5 shrink-0" />
-                            <span>{selectedWorker.username}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-6">
-                    <p className="text-sm text-muted-foreground">
-                      No workers registered on this machine
-                    </p>
-                  </div>
-                </div>
-                <WorkerActionMenu machineId={selectedMachineId} />
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Connection Error Alert */}
@@ -604,6 +527,12 @@ export function ChatInterface() {
               disabled={isLoading}
               placeholder="Type your message... (Shift+Enter for new line)"
               autoFocus={true}
+              workers={workersAsAssistants}
+              selectedWorkerId={selectedWorkerId}
+              onWorkerChange={handleWorkerChange}
+              workerWorkingDirectories={workerWorkingDirectories}
+              workerUsernames={workerUsernames}
+              workersDisabled={workersLoading || !!session}
             />
           </div>
         </div>
@@ -634,6 +563,12 @@ export function ChatInterface() {
               disabled={isLoading}
               placeholder="Type your message... (Shift+Enter for new line)"
               autoFocus={true}
+              workers={workersAsAssistants}
+              selectedWorkerId={selectedWorkerId}
+              onWorkerChange={handleWorkerChange}
+              workerWorkingDirectories={workerWorkingDirectories}
+              workerUsernames={workerUsernames}
+              workersDisabled={workersLoading || !!session}
             />
           </div>
         </div>
