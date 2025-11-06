@@ -258,8 +258,8 @@ importers:
   services/worker:
     dependencies:
       '@opencode-ai/sdk':
-        specifier: ^1.0.19
-        version: 1.0.19
+        specifier: ^1.0.33
+        version: 1.0.33
       '@workspace/backend':
         specifier: workspace:*
         version: link:../backend
@@ -1262,8 +1262,8 @@ packages:
   '@nx/workspace@21.4.1':
     resolution: {integrity: sha512-3e33eTb1hRx6/i416Wc0mk/TPANxjx2Kz8ecnyqFFII5CM9tX7CPCwDF4O75N9mysI6PCKJ+Hc/1q76HZR4UgA==}
 
-  '@opencode-ai/sdk@1.0.19':
-    resolution: {integrity: sha512-FOzCO/RdLPkz8jzod3q5lp6SPGKQxhpm9hUcDhCEy1ExbX/tmvpY86j3aki/uA32H64JAt2+8Lzg+WUBVafexA==}
+  '@opencode-ai/sdk@1.0.33':
+    resolution: {integrity: sha512-Kb9NkENDYFe2hRS62p0HExz6ow1AxWKzODotSVe2rzDVpT3kpzr47q2cLb5GpvAlqRbtlu/Cvxv/3ngnLOAMXA==}
 
   '@oxc-resolver/binding-darwin-arm64@5.0.0':
     resolution: {integrity: sha512-zwHAf+owoxSWTDD4dFuwW+FkpaDzbaL30H5Ltocb+RmLyg4WKuteusRLKh5Y8b/cyu7UzhxM0haIqQjyqA1iuA==}
@@ -6077,7 +6077,7 @@ snapshots:
       - '@swc/core'
       - debug
 
-  '@opencode-ai/sdk@1.0.19': {}
+  '@opencode-ai/sdk@1.0.33': {}
 
   '@oxc-resolver/binding-darwin-arm64@5.0.0':
     optional: true
