@@ -92,7 +92,7 @@ export const loginAnon = mutation({
     const userId = await ctx.db.insert('users', {
       type: 'anonymous',
       name: anonName,
-      // accessLevel defaults to 'user' via getAccessLevel helper
+      accessLevel: 'user', // Default access level for new anonymous users
     });
 
     // Create a new session if it doesn't exist

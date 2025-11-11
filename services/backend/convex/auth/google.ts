@@ -1015,7 +1015,7 @@ async function _convertAnonymousToFullUser(
       google: googleProfile,
       name: googleProfile.name,
       recoveryCode: anonymousUser.recoveryCode,
-      accessLevel: anonymousUser.accessLevel,
+      accessLevel: anonymousUser.accessLevel ?? 'user', // Ensure access level is set
     });
   } else {
     // Convert anonymous user to full user
@@ -1026,7 +1026,7 @@ async function _convertAnonymousToFullUser(
       google: googleProfile,
       name: googleProfile.name,
       recoveryCode: anonymousUser.recoveryCode,
-      accessLevel: anonymousUser.accessLevel,
+      accessLevel: anonymousUser.accessLevel ?? 'user', // Ensure access level is set
     });
   }
 }
