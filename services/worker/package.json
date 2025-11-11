@@ -31,11 +31,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@opencode-ai/sdk": "^0.15.30",
+    "@opencode-ai/sdk": "^1.0.33",
     "@workspace/backend": "workspace:*",
     "convex": "^1.16.0",
-    "nanoid": "^5.0.8",
     "dotenv": "^16.4.5",
+    "nanoid": "^5.0.8",
     "zod": "^3.23.8"
   },
   "devDependencies": {
