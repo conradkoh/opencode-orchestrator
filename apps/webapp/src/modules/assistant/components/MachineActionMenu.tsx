@@ -26,6 +26,7 @@ import {
 import { useDeleteMachine } from '../hooks/useDeleteMachine';
 import type { Machine } from '../types';
 import { CreateMachineDialog } from './CreateMachineDialog';
+import { CreateWorkerDialog } from './CreateWorkerDialog';
 
 /**
  * Props for MachineActionMenu component.
@@ -47,6 +48,7 @@ export interface MachineActionMenuProps {
 export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
   const router = useRouter();
   const [showCreateMachineDialog, setShowCreateMachineDialog] = useState(false);
+  const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const { deleteMachine, isDeleting } = useDeleteMachine();
 
@@ -92,6 +94,10 @@ export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>This Machine</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setShowCreateWorkerDialog(true)}>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add Worker
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/app/machine/${selectedMachine.machineId}/settings`}>
                   <SettingsIcon className="h-4 w-4 mr-2" />
@@ -115,6 +121,14 @@ export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
         open={showCreateMachineDialog}
         onOpenChange={setShowCreateMachineDialog}
       />
+
+      {selectedMachine && (
+        <CreateWorkerDialog
+          machineId={selectedMachine.machineId}
+          open={showCreateWorkerDialog}
+          onOpenChange={setShowCreateWorkerDialog}
+        />
+      )}
 
       {selectedMachine && (
         <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
