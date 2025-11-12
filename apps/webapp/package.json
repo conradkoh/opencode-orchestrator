@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "generate:icons": "bun run scripts/generate-icons.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -64,6 +65,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.0",
     "@vitest/ui": "^4.0.6",
+    "bun": "^1.3.2",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
     "jsdom": "^27.1.0",

@@ -45,9 +45,11 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "@biomejs/biome",
+      "bun",
       "esbuild",
       "nx",
-      "sharp"
+      "sharp",
+      "unrs-resolver"
     ],
     "overrides": {
       "@radix-ui/react-dismissable-layer": "1.1.10"
