@@ -382,3 +382,4 @@ export const setOffline = mutation({
 4. **Metrics**: Track shutdown duration and reasons in monitoring system
 5. **Health check**: Expose endpoint to verify worker is shutting down gracefully
 
+
