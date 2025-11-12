@@ -34,6 +34,8 @@ import { CreateWorkerDialog } from './CreateWorkerDialog';
 export interface MachineActionMenuProps {
   /** Currently selected machine, or null if none selected */
   selectedMachine: Machine | null;
+  /** Optional external handler to open the create worker dialog */
+  onOpenCreateWorkerDialog?: () => void;
 }
 
 /**
@@ -45,7 +47,10 @@ export interface MachineActionMenuProps {
  * <MachineActionMenu selectedMachine={selectedMachine} />
  * ```
  */
-export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
+export function MachineActionMenu({
+  selectedMachine,
+  onOpenCreateWorkerDialog,
+}: MachineActionMenuProps) {
   const router = useRouter();
   const [showCreateMachineDialog, setShowCreateMachineDialog] = useState(false);
   const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
@@ -94,7 +99,15 @@ export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>This Machine</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setShowCreateWorkerDialog(true)}>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (onOpenCreateWorkerDialog) {
+                    onOpenCreateWorkerDialog();
+                  } else {
+                    setShowCreateWorkerDialog(true);
+                  }
+                }}
+              >
                 <PlusIcon className="h-4 w-4 mr-2" />
                 Add Worker
               </DropdownMenuItem>
@@ -122,7 +135,7 @@ export function MachineActionMenu({ selectedMachine }: MachineActionMenuProps) {
         onOpenChange={setShowCreateMachineDialog}
       />
 
-      {selectedMachine && (
+      {selectedMachine && !onOpenCreateWorkerDialog && (
         <CreateWorkerDialog
           machineId={selectedMachine.machineId}
           open={showCreateWorkerDialog}

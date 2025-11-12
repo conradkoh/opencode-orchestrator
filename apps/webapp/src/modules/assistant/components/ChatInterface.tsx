@@ -2,7 +2,14 @@
 
 import { api } from '@workspace/backend/convex/_generated/api';
 import { useSessionMutation } from 'convex-helpers/react/sessions';
-import { AlertCircleIcon, PlusIcon, RefreshCwIcon, ServerIcon, XIcon } from 'lucide-react';
+import {
+  ActivityIcon,
+  AlertCircleIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  ServerIcon,
+  XIcon,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -26,6 +33,7 @@ import { useWorkers } from '../hooks/useWorkers';
 import type { Assistant } from '../types';
 import { type ChatInputHandle, ChatInputWithModel } from './ChatInputWithModel';
 import { ChatMessageList } from './ChatMessageList';
+import { CreateWorkerDialog } from './CreateWorkerDialog';
 import { MachineSelector } from './MachineSelector';
 import { SessionHistoryModal } from './SessionHistoryModal';
 
@@ -60,6 +68,7 @@ export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
   const [showResumeConfirmDialog, setShowResumeConfirmDialog] = useState(false);
+  const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<{ content: string; model: string } | null>(
     null
   );
@@ -210,6 +219,7 @@ export function ChatInterface() {
   /**
    * Handles machine selection change.
    * Updates URL which triggers re-render with new state.
+   * @param machineId - The ID of the selected machine
    */
   const handleMachineChange = useCallback(
     (machineId: string) => {
@@ -223,6 +233,7 @@ export function ChatInterface() {
   /**
    * Handles worker selection change.
    * Updates URL which triggers re-render with new state.
+   * @param workerId - The ID of the selected worker
    */
   const handleWorkerChange = useCallback(
     (workerId: string) => {
@@ -238,6 +249,7 @@ export function ChatInterface() {
    * Auto-creates a session if none exists.
    * Shows confirmation dialog if session is inactive.
    * Passes the currently selected model with each message.
+   * @param content - The message content to send
    */
   const handleSendMessage = useCallback(
     async (content: string) => {
@@ -288,6 +300,7 @@ export function ChatInterface() {
   /**
    * Handles restoring an existing session.
    * Focuses input after restoration.
+   * @param sessionId - The ID of the session to restore
    */
   const handleRestoreSession = useCallback(
     async (sessionId: string) => {
@@ -378,6 +391,7 @@ export function ChatInterface() {
   /**
    * Handles model selection change.
    * Updates local state - model will be sent with next message.
+   * @param model - The ID of the selected model
    */
   const handleModelChange = useCallback((model: string) => {
     console.log('[ChatInterface] Model changed to:', model);
@@ -385,7 +399,7 @@ export function ChatInterface() {
   }, []);
 
   /**
-   * Handles retrying worker connection
+   * Handles retrying worker connection.
    */
   const handleRetryConnection = useCallback(() => {
     if (selectedWorkerId) {
@@ -413,6 +427,7 @@ export function ChatInterface() {
             selectedMachineId={selectedMachineId}
             onMachineChange={handleMachineChange}
             disabled={machinesLoading || !!session}
+            onOpenCreateWorkerDialog={() => setShowCreateWorkerDialog(true)}
           />
         </div>
       </div>
@@ -574,7 +589,62 @@ export function ChatInterface() {
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center border border-border rounded-lg bg-background">
-          <p className="text-sm text-muted-foreground">Select an assistant to view sessions</p>
+          {selectedMachineId && workersAsAssistants.length === 0 && !workersLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-6 max-w-2xl">
+              {/* Icon */}
+              <div className="rounded-full bg-muted p-6">
+                <ActivityIcon className="h-12 w-12 text-muted-foreground" />
+              </div>
+
+              {/* Message */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">Add Your First Worker</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Workers are processes that run on your machine to execute tasks. Get started by
+                  creating your first worker token.
+                </p>
+              </div>
+
+              {/* Call to Action Button */}
+              <Button size="lg" onClick={() => setShowCreateWorkerDialog(true)} className="gap-2">
+                <PlusIcon className="h-5 w-5" />
+                Add Worker
+              </Button>
+
+              {/* Instructions */}
+              <div className="w-full max-w-md space-y-3 text-left">
+                <p className="text-sm font-medium text-foreground">How to add a worker:</p>
+                <ol className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                      1
+                    </span>
+                    <span>Click "Add Worker" above or use the action menu (⋮)</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                      2
+                    </span>
+                    <span>Copy the generated worker token</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                      3
+                    </span>
+                    <span>Configure the token on your machine and start the worker</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                      4
+                    </span>
+                    <span>Approve the worker when it appears in the pending list</span>
+                  </li>
+                </ol>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Select an assistant to view sessions</p>
+          )}
         </div>
       )}
 
@@ -594,6 +664,15 @@ export function ChatInterface() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Worker Dialog */}
+      {selectedMachineId && (
+        <CreateWorkerDialog
+          machineId={selectedMachineId}
+          open={showCreateWorkerDialog}
+          onOpenChange={setShowCreateWorkerDialog}
+        />
+      )}
     </div>
   );
 }

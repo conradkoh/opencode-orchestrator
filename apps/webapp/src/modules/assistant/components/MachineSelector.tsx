@@ -1,6 +1,7 @@
 'use client';
 
 import { ServerIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -25,6 +26,8 @@ export interface MachineSelectorProps {
   onMachineChange: (machineId: string) => void;
   /** Whether the selector is disabled */
   disabled?: boolean;
+  /** Optional external handler to open the create worker dialog */
+  onOpenCreateWorkerDialog?: () => void;
 }
 
 /**
@@ -46,8 +49,12 @@ export function MachineSelector({
   selectedMachineId,
   onMachineChange,
   disabled,
+  onOpenCreateWorkerDialog,
 }: MachineSelectorProps) {
-  const selectedMachine = machines.find((m) => m.machineId === selectedMachineId);
+  const selectedMachine = useMemo(
+    () => machines.find((m) => m.machineId === selectedMachineId),
+    [machines, selectedMachineId]
+  );
 
   return (
     <div className="flex items-center gap-2">
@@ -145,7 +152,10 @@ export function MachineSelector({
           </SelectContent>
         </Select>
       </div>
-      <MachineActionMenu selectedMachine={selectedMachine || null} />
+      <MachineActionMenu
+        selectedMachine={selectedMachine || null}
+        onOpenCreateWorkerDialog={onOpenCreateWorkerDialog}
+      />
     </div>
   );
 }

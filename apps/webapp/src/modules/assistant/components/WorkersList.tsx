@@ -37,6 +37,58 @@ export interface WorkersListProps {
   machineId: string;
   /** Optional callback when worker is removed */
   onWorkerRemoved?: () => void;
+  /** Optional callback when add worker button is clicked */
+  onAddWorkerClick?: () => void;
+}
+
+/**
+ * Internal state for tracking which worker is pending removal.
+ */
+interface _WorkerToRemove {
+  /** Worker ID to remove */
+  id: string;
+  /** Optional worker name for display in confirmation dialog */
+  name?: string;
+}
+
+/**
+ * Internal grouping of workers by status.
+ */
+interface _GroupedWorkers {
+  /** Workers that are active and online */
+  active: Worker[];
+  /** Workers that are approved but offline */
+  offline: Worker[];
+  /** Workers pending approval */
+  pending: Worker[];
+}
+
+/**
+ * Internal configuration for worker status display.
+ */
+interface _StatusConfig {
+  /** CSS classes for the badge */
+  badge: string;
+  /** CSS classes for the status dot */
+  dot: string;
+  /** Display label for the status */
+  label: string;
+  /** Icon component to display */
+  icon: typeof ActivityIcon | typeof CheckCircle2Icon | typeof CircleIcon | typeof ClockIcon;
+}
+
+/**
+ * Props for the internal WorkerItem component.
+ */
+interface _WorkerItemProps {
+  /** Worker data to display */
+  worker: Worker;
+  /** Callback fired when remove button is clicked */
+  onRemove: (workerId: string, workerName?: string) => void;
+  /** Color scheme for the status indicator */
+  statusColor: 'green' | 'gray' | 'orange';
+  /** Whether a remove operation is in progress */
+  isRemoving: boolean;
 }
 
 /**
@@ -48,13 +100,13 @@ export interface WorkersListProps {
  * <WorkersList machineId="machine_abc123" />
  * ```
  */
-export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
+export function WorkersList({ machineId, onWorkerRemoved, onAddWorkerClick }: WorkersListProps) {
   const { workers, loading } = useWorkers(machineId);
   const { removeWorker, isRemoving } = useRemoveWorker();
-  const [workerToRemove, setWorkerToRemove] = useState<{ id: string; name?: string } | null>(null);
+  const [workerToRemove, setWorkerToRemove] = useState<_WorkerToRemove | null>(null);
 
   // Group workers by status
-  const groupedWorkers = useMemo(() => {
+  const groupedWorkers = useMemo<_GroupedWorkers>(() => {
     if (!workers) {
       return { active: [], offline: [], pending: [] };
     }
@@ -66,10 +118,18 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
     };
   }, [workers]);
 
+  /**
+   * Handles the remove button click.
+   * @param workerId - ID of the worker to remove
+   * @param workerName - Optional name of the worker for display
+   */
   const handleRemoveClick = useCallback((workerId: string, workerName?: string) => {
     setWorkerToRemove({ id: workerId, name: workerName });
   }, []);
 
+  /**
+   * Handles confirming the worker removal.
+   */
   const handleRemoveConfirm = useCallback(async () => {
     if (!workerToRemove) return;
 
@@ -107,11 +167,23 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
           <CardDescription>No workers registered yet</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No workers have been created for this machine yet.</p>
-            <p className="text-sm mt-2">
-              Use the action menu (⋮) next to the machine selector to add a worker.
-            </p>
+          <div className="flex items-center gap-4 py-6">
+            {/* Icon */}
+            <div className="rounded-full bg-muted p-3">
+              <ActivityIcon className="h-6 w-6 text-muted-foreground" />
+            </div>
+
+            {/* Message and Action */}
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">
+                Add a worker to start executing tasks on this machine
+              </p>
+            </div>
+
+            {/* Button */}
+            <Button variant="outline" size="sm" className="shrink-0" onClick={onAddWorkerClick}>
+              Add Worker
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -139,7 +211,7 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
               </div>
               <div className="space-y-2">
                 {groupedWorkers.active.map((worker) => (
-                  <WorkerItem
+                  <_WorkerItem
                     key={worker.workerId}
                     worker={worker}
                     onRemove={handleRemoveClick}
@@ -165,7 +237,7 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
               </div>
               <div className="space-y-2">
                 {groupedWorkers.offline.map((worker) => (
-                  <WorkerItem
+                  <_WorkerItem
                     key={worker.workerId}
                     worker={worker}
                     onRemove={handleRemoveClick}
@@ -192,7 +264,7 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
               </div>
               <div className="space-y-2">
                 {groupedWorkers.pending.map((worker) => (
-                  <WorkerItem
+                  <_WorkerItem
                     key={worker.workerId}
                     worker={worker}
                     onRemove={handleRemoveClick}
@@ -241,35 +313,32 @@ export function WorkersList({ machineId, onWorkerRemoved }: WorkersListProps) {
 
 /**
  * Individual worker item component.
+ * Displays worker information including name, status, directory, and controls.
  */
-interface WorkerItemProps {
-  worker: Worker;
-  onRemove: (workerId: string, workerName?: string) => void;
-  statusColor: 'green' | 'gray' | 'orange';
-  isRemoving: boolean;
-}
-
-function WorkerItem({ worker, onRemove, statusColor, isRemoving }: WorkerItemProps) {
-  const statusConfig = {
-    green: {
-      badge: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-      dot: 'bg-green-500 dark:bg-green-400',
-      label: worker.status === 'online' ? 'Online' : 'Ready',
-      icon: worker.status === 'online' ? ActivityIcon : CheckCircle2Icon,
-    },
-    gray: {
-      badge: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
-      dot: 'bg-gray-400 dark:bg-gray-500',
-      label: 'Offline',
-      icon: CircleIcon,
-    },
-    orange: {
-      badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
-      dot: 'bg-orange-500 dark:bg-orange-400',
-      label: 'Pending',
-      icon: ClockIcon,
-    },
-  };
+function _WorkerItem({ worker, onRemove, statusColor, isRemoving }: _WorkerItemProps) {
+  const statusConfig: Record<'green' | 'gray' | 'orange', _StatusConfig> = useMemo(
+    () => ({
+      green: {
+        badge: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+        dot: 'bg-green-500 dark:bg-green-400',
+        label: worker.status === 'online' ? 'Online' : 'Ready',
+        icon: worker.status === 'online' ? ActivityIcon : CheckCircle2Icon,
+      },
+      gray: {
+        badge: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
+        dot: 'bg-gray-400 dark:bg-gray-500',
+        label: 'Offline',
+        icon: CircleIcon,
+      },
+      orange: {
+        badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+        dot: 'bg-orange-500 dark:bg-orange-400',
+        label: 'Pending',
+        icon: ClockIcon,
+      },
+    }),
+    [worker.status]
+  );
 
   const config = statusConfig[statusColor];
   const StatusIcon = config.icon;

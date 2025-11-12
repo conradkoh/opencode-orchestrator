@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { useDeleteMachine } from '../hooks/useDeleteMachine';
 import { useMachines } from '../hooks/useMachines';
+import { CreateWorkerDialog } from './CreateWorkerDialog';
 import { PendingWorkersList } from './PendingWorkersList';
 import { WorkersList } from './WorkersList';
 
@@ -44,6 +45,7 @@ export function MachineSettingsContent({ machineId }: MachineSettingsContentProp
   const { machines, loading } = useMachines();
   const { deleteMachine, isDeleting } = useDeleteMachine();
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [showCreateWorkerDialog, setShowCreateWorkerDialog] = useState(false);
 
   const machine = useMemo(
     () => machines?.find((m) => m.machineId === machineId),
@@ -109,7 +111,10 @@ export function MachineSettingsContent({ machineId }: MachineSettingsContentProp
         <PendingWorkersList machineId={machineId} />
 
         {/* All Workers */}
-        <WorkersList machineId={machineId} />
+        <WorkersList
+          machineId={machineId}
+          onAddWorkerClick={() => setShowCreateWorkerDialog(true)}
+        />
 
         {/* Machine Details */}
         <Card>
@@ -234,6 +239,13 @@ export function MachineSettingsContent({ machineId }: MachineSettingsContentProp
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Create Worker Dialog */}
+      <CreateWorkerDialog
+        machineId={machineId}
+        open={showCreateWorkerDialog}
+        onOpenChange={setShowCreateWorkerDialog}
+      />
     </>
   );
 }
