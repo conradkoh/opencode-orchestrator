@@ -32,12 +32,12 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "2.1.2",
-    "@nx/workspace": "21.4.1",
+    "@nx/workspace": "22.1.2",
     "@types/node": "^20.17.24",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.0",
-    "nx": "21.4.1",
-    "typescript": "^5.3.3"
+    "nx": "22.1.2",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.1.8"
