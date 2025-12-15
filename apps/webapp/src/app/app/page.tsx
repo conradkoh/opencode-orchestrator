@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatInterface } from '@/modules/assistant/components/ChatInterface';
 import { CreateMachineDialog } from '@/modules/assistant/components/CreateMachineDialog';

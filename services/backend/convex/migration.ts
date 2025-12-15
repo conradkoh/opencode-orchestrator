@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+
 import { internal } from './_generated/api';
 import { internalAction, internalMutation, internalQuery } from './_generated/server';
 
@@ -16,7 +17,7 @@ interface PaginationOpts {
 export const unsetSessionExpiration = internalMutation({
   args: { sessionId: v.id('sessions') },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.sessionId, {
+    await ctx.db.patch('sessions', args.sessionId, {
       expiresAt: undefined,
       expiresAtLabel: undefined,
     });
@@ -82,14 +83,14 @@ export const getSessionsBatch = internalQuery({
 export const setUserAccessLevelDefault = internalMutation({
   args: { userId: v.id('users') },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
+    const user = await ctx.db.get('users', args.userId);
     if (!user) {
       return; // User doesn't exist, skip
     }
 
     // Only update if accessLevel is undefined
     if (user.accessLevel === undefined) {
-      await ctx.db.patch(args.userId, {
+      await ctx.db.patch('users', args.userId, {
         accessLevel: 'user',
       });
     }
@@ -116,7 +117,7 @@ export const setAllUndefinedAccessLevelsToUser = internalMutation({
     // Update all users in parallel
     await Promise.all(
       usersToUpdate.map((user) =>
-        ctx.db.patch(user._id, {
+        ctx.db.patch('users', user._id, {
           accessLevel: 'user',
         })
       )
