@@ -1,6 +1,8 @@
 import { Effect, Exit, Fiber } from 'effect';
 
-import { Server } from './app/server';
+import { createServer } from './app/server';
+import { loadEnv } from './config/env';
+import { createConvexService } from './services/convex';
 
 /**
  * Main entry point for the OpenCode Worker.
@@ -14,8 +16,16 @@ let shuttingDown = false;
 const program = Effect.gen(function* () {
   console.log('Starting OpenCode Worker...');
 
-  // Get the current fiber
-  const fiber = yield* Effect.fork(Server);
+  // Load environment configuration
+  const config = yield* loadEnv;
+  console.log('Configuration loaded');
+
+  // Create Convex service (includes client and event queue)
+  const convexService = yield* createConvexService(config);
+  console.log('Convex service initialized');
+
+  // Create server with Convex event queue
+  const serverFiber = yield* Effect.fork(createServer(convexService.eventQueue));
 
   // Setup signal handlers
   const handleShutdown = (signal: string) => {
@@ -32,7 +42,7 @@ const program = Effect.gen(function* () {
     Effect.runPromise(
       Effect.gen(function* () {
         yield* Effect.sync(() => console.log('Interrupting server fiber...'));
-        const exit = yield* Fiber.interrupt(fiber);
+        const exit = yield* Fiber.interrupt(serverFiber);
         yield* Effect.sync(() => console.log('Fiber interrupted'));
         yield* Effect.sync(() => console.log('Server shutdown complete'));
         yield* Effect.sync(() => process.exit(Exit.isSuccess(exit) ? 0 : 1));
@@ -57,7 +67,7 @@ const program = Effect.gen(function* () {
   console.log('Process PID:', process.pid);
 
   // Wait for the server fiber to complete
-  yield* Fiber.join(fiber);
+  yield* Fiber.join(serverFiber);
 
   console.log('OpenCode Worker shutdown complete');
 });
