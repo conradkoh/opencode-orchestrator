@@ -5,9 +5,9 @@ export default function manifest(): MetadataRoute.Manifest {
   const startUrl = featureFlags.disableLogin ? '/' : '/app';
 
   return {
-    name: 'Next Convex App',
-    short_name: 'Next Convex',
-    description: 'A Next.js app with Convex backend',
+    name: 'OpenCode Orchestrator',
+    short_name: 'OpenCode',
+    description: 'AI assistant orchestration platform with OpenCode integration',
     icons: [
       {
         src: '/appicon-16x16.png',

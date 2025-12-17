@@ -27,15 +27,15 @@ export const viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Next Convex App',
-  description: 'A Next.js app with Convex backend',
+  title: 'OpenCode Orchestrator',
+  description: 'AI assistant orchestration platform with OpenCode integration',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Next Convex App',
+    title: 'OpenCode Orchestrator',
   },
-  applicationName: 'Next Convex App',
+  applicationName: 'OpenCode Orchestrator',
   formatDetection: {
     telephone: false,
   },
