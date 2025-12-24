@@ -47,7 +47,7 @@ describe('Navigation', () => {
 
     render(<Navigation />);
 
-    const titleLink = screen.getByRole('link', { name: /next convex/i });
+    const titleLink = screen.getByRole('link', { name: /opencode orchestrator/i });
     expect(titleLink).toBeInTheDocument();
     expect(titleLink).toHaveAttribute('href', '/');
   });
@@ -68,7 +68,7 @@ describe('Navigation', () => {
 
     render(<Navigation />);
 
-    const titleLink = screen.getByRole('link', { name: /next convex/i });
+    const titleLink = screen.getByRole('link', { name: /opencode orchestrator/i });
     expect(titleLink).toBeInTheDocument();
     expect(titleLink).toHaveAttribute('href', '/app');
   });
